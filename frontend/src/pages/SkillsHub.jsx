@@ -99,57 +99,33 @@ const SkillsHub = () => {
             <Code size={24} />
           </div>
           <div>
-<<<<<<< HEAD
-            <h2 className="text-3xl font-bold">Skills Hub</h2>
-            <p className="text-gray-400 mt-0.5 text-sm">
-=======
             <h2 className="text-2xl sm:text-3xl font-bold">Skills Hub</h2>
             <p className="text-gray-400 mt-0.5 text-xs sm:text-sm">
->>>>>>> phase2Code
               AI-curated learning · Real-time progress tracking.
             </p>
           </div>
         </div>
 
-<<<<<<< HEAD
-        <div className="flex gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-=======
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto md:max-w-2xl">
           <div className="relative flex-1 w-full sm:w-auto md:min-w-[250px]">
->>>>>>> phase2Code
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search skills..."
-<<<<<<< HEAD
-              className="w-full bg-surface border border-white/5 rounded-full py-2 pl-9 pr-4 text-sm focus:border-primary/50 text-white outline-none transition-colors placeholder-gray-600"
-            />
-          </div>
-          <PremiumButton>
-=======
               className="w-full bg-surface border border-white/5 rounded-full py-2.5 sm:py-2 pl-9 pr-4 text-sm focus:border-primary/50 text-white outline-none transition-colors placeholder-gray-600"
             />
           </div>
           <PremiumButton className="w-full sm:w-auto">
->>>>>>> phase2Code
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => requireAuth(() => setShowAddModal(true))}
-<<<<<<< HEAD
-              className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full font-semibold transition-all shadow-lg shadow-primary/20 flex items-center gap-2 whitespace-nowrap"
-            >
-              <Plus size={18} />
-              <span className="hidden md:inline">Add Skill</span>
-=======
               className="bg-primary hover:bg-primary/90 text-white px-4 py-2.5 sm:py-2 rounded-full font-semibold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap min-h-[44px]"
             >
               <Plus size={18} />
               <span>Add Skill</span>
->>>>>>> phase2Code
             </motion.button>
           </PremiumButton>
         </div>
@@ -168,11 +144,7 @@ const SkillsHub = () => {
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-<<<<<<< HEAD
-            className="grid grid-cols-3 gap-3"
-=======
             className="grid grid-cols-1 sm:grid-cols-3 gap-3"
->>>>>>> phase2Code
           >
             <div className="glass-card !p-4 flex items-center gap-3">
               <div className="p-2 bg-yellow-400/10 rounded-xl">
@@ -206,20 +178,12 @@ const SkillsHub = () => {
       </AnimatePresence>
 
       {/* ── Category pills ── */}
-<<<<<<< HEAD
-      <div className="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar border-b border-white/5 pb-4">
-=======
       <div className="flex overflow-x-auto gap-3 pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap no-scrollbar border-b border-white/5 md:pb-4">
->>>>>>> phase2Code
         {CATEGORIES.map((c) => (
           <button
             key={c}
             onClick={() => setActiveCategory(c)}
-<<<<<<< HEAD
-            className={`px-4 py-2 whitespace-nowrap rounded-full transition-all text-sm font-medium border
-=======
             className={`px-4 py-2 whitespace-nowrap rounded-full transition-all text-sm font-medium border min-h-[40px]
->>>>>>> phase2Code
               ${activeCategory === c
                 ? 'bg-primary/20 text-white border-primary/50 shadow-[0_0_15px_rgba(99,102,241,0.2)]'
                 : 'bg-surface text-gray-400 border-transparent hover:text-white hover:bg-white/10'
@@ -276,11 +240,7 @@ const SkillsHub = () => {
 
       {/* Skill grid */}
       {isAuthenticated && !error && (
-<<<<<<< HEAD
-        <ScrollRevealGroup stagger={0.06} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-1">
-=======
         <ScrollRevealGroup stagger={0.06} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pt-1">
->>>>>>> phase2Code
           {loading
             ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
             : filteredSkills.length === 0
@@ -348,6 +308,8 @@ const SkillsHub = () => {
           />
         )}
       </AnimatePresence>
+
+
     </div>
   );
 };

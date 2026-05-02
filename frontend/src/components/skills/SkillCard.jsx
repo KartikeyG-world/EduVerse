@@ -49,11 +49,7 @@ const DIFFICULTY_STYLES = {
 
 const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const { _id, title, category, progress, completed, watchedDuration, totalDuration, type, videos, completedVideos, difficulty, source, channelName } = skill;
-=======
   const { _id, title, category, progress, completed, watchedDuration, totalDuration, type, videos, completedVideos, difficulty, source, channelName, thumbnailUrl } = skill;
->>>>>>> phase2Code
 
   const progressColor = completed
     ? 'from-yellow-400 to-amber-500'
@@ -80,11 +76,7 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
 
   return (
     <div
-<<<<<<< HEAD
-      className={`glass-card-hover flex flex-col justify-between group relative overflow-hidden cursor-default
-=======
       className={`glass-card-hover flex flex-col justify-between group relative overflow-hidden cursor-default p-4 md:p-5
->>>>>>> phase2Code
         ${completed ? 'hover:border-yellow-400/40 hover:shadow-yellow-400/10' : ''}`}
     >
       {/* Completion glow overlay */}
@@ -104,8 +96,6 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
       </div>
 
       <div>
-<<<<<<< HEAD
-=======
         {/* Thumbnail (if available) */}
         {thumbnailUrl && (
           <img 
@@ -115,7 +105,6 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
           />
         )}
 
->>>>>>> phase2Code
         {/* Header row */}
         <div className="flex justify-between items-start mb-4 pr-8">
           <div className={`p-2.5 rounded-xl border ${getCategoryColor(category)} transition-all group-hover:scale-110`}>
