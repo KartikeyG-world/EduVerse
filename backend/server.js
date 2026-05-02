@@ -28,6 +28,23 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("Connected to MongoDB Atlas");
+    
+    // Health Check Route
+    app.get("/health", (req, res) => res.json({ status: "ok", message: "Server is running smoothly" }));
+
+    // Global Error Handler
+    app.use((err, req, res, next) => {
+      console.error("Unhandled Error:", err.stack);
+      res.status(500).json({ 
+        message: "Internal Server Error", 
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+      });
+    });
+
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1); // Exit if DB connection fails
+  });
+

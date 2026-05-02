@@ -71,19 +71,11 @@ const ExpenseTracker = () => {
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
         <div className="p-3 glass rounded-xl text-secondary">
-<<<<<<< HEAD
-          <CreditCard size={24} />
-        </div>
-        <div>
-          <h2 className="text-3xl font-bold">Expense Tracker</h2>
-          <p className="text-gray-400 mt-1">Manage your educational budget and spending</p>
-=======
           <CreditCard className="w-6 h-6 sm:w-7 sm:h-7" />
         </div>
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold">Expense Tracker</h2>
           <p className="text-sm sm:text-base text-gray-400 mt-1">Manage your educational budget and spending</p>
->>>>>>> phase2Code
         </div>
       </div>
 
@@ -91,15 +83,9 @@ const ExpenseTracker = () => {
         {/* Add Expense Form */}
         <ScrollReveal 
           delay={0.1}
-<<<<<<< HEAD
-          className="lg:col-span-1 glass-card-hover self-start"
-        >
-          <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-=======
           className="lg:col-span-1 glass-card-hover self-start p-4 sm:p-5"
         >
           <h3 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
->>>>>>> phase2Code
             <Plus size={20} className="text-secondary" /> Add Expense
           </h3>
           <form onSubmit={handleAdd} className="space-y-4">
@@ -143,11 +129,7 @@ const ExpenseTracker = () => {
               <button 
                 type="submit" 
                 disabled={loading}
-<<<<<<< HEAD
-                className="w-full bg-secondary hover:bg-secondary/90 text-white font-medium rounded-xl py-3 mt-2 transition-all transform hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2"
-=======
                 className="w-full bg-secondary hover:bg-secondary/90 text-white font-medium rounded-xl py-3 mt-2 transition-all transform hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
->>>>>>> phase2Code
               >
                 Add Record
               </button>
@@ -161,54 +143,32 @@ const ExpenseTracker = () => {
           className="lg:col-span-2 space-y-6"
         >
           {/* Top Stat Cards */}
-<<<<<<< HEAD
-          <ScrollRevealGroup stagger={0.1} className="grid grid-cols-2 gap-4">
-            <div className="glass-card-hover flex items-center gap-4 py-4">
-=======
           <ScrollRevealGroup stagger={0.1} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="glass-card-hover flex items-center gap-4 py-4 px-4 sm:px-5">
->>>>>>> phase2Code
               <div className="p-3 bg-secondary/20 rounded-xl text-secondary">
                 <TrendingUp size={24} />
               </div>
               <div>
                 <p className="text-gray-400 text-sm">Total Spent</p>
-<<<<<<< HEAD
-                <p className="text-2xl font-bold">${totalExpenses.toFixed(2)}</p>
-              </div>
-            </div>
-            <div className="glass-card-hover flex items-center gap-4 py-4">
-=======
                 <p className="text-xl sm:text-2xl font-bold">${totalExpenses.toFixed(2)}</p>
               </div>
             </div>
             <div className="glass-card-hover flex items-center gap-4 py-4 px-4 sm:px-5">
->>>>>>> phase2Code
                <div className="p-3 bg-primary/20 rounded-xl text-primary">
                 <PieChart size={24} />
               </div>
               <div>
                 <p className="text-gray-400 text-sm">Top Category</p>
-<<<<<<< HEAD
-                <p className="text-lg font-bold truncate">
-=======
                 <p className="text-base sm:text-lg font-bold truncate">
->>>>>>> phase2Code
                   {categoryData.length > 0 ? [...categoryData].sort((a,b) => b.value - a.value)[0].name : 'N/A'}
                 </p>
               </div>
             </div>
           </ScrollRevealGroup>
 
-<<<<<<< HEAD
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
-            {/* Chart */}
-             <div className="glass-card-hover flex flex-col items-center justify-center h-full">
-=======
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-auto md:h-[400px]">
             {/* Chart */}
              <div className="glass-card-hover flex flex-col items-center justify-center h-[300px] md:h-full p-4 sm:p-5">
->>>>>>> phase2Code
                <h3 className="text-lg font-semibold w-full text-left mb-2 text-gray-300">Spending by Category</h3>
               {categoryData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -239,11 +199,7 @@ const ExpenseTracker = () => {
             </div>
 
             {/* List */}
-<<<<<<< HEAD
-             <div className="glass-card-hover flex flex-col overflow-hidden h-full">
-=======
              <div className="glass-card-hover flex flex-col overflow-hidden h-[400px] md:h-full p-4 sm:p-5">
->>>>>>> phase2Code
                <h3 className="text-lg font-semibold w-full text-left mb-4 text-gray-300">Recent Transactions</h3>
                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                  {expenses.length === 0 ? (
@@ -253,22 +209,14 @@ const ExpenseTracker = () => {
                       <div key={exp._id} className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/5 hover:border-white/20 transition-colors">
                         <div className="overflow-hidden">
                           <p className="font-medium text-sm text-white truncate">{exp.description}</p>
-<<<<<<< HEAD
-                          <div className="flex items-center gap-2 mt-1">
-=======
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
->>>>>>> phase2Code
                             <span className="text-xs px-2 py-0.5 rounded bg-surface border border-white/10 text-gray-300">{exp.category}</span>
                             <span className="text-xs text-gray-500">{new Date(exp.date).toLocaleDateString()}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 ml-2 shrink-0">
                            <span className="font-bold text-secondary">${exp.amount.toFixed(2)}</span>
-<<<<<<< HEAD
-                           <button onClick={() => handleDelete(exp._id)} className="text-gray-500 hover:text-accent transition-colors p-1">
-=======
                            <button onClick={() => handleDelete(exp._id)} className="text-gray-500 hover:text-accent transition-colors p-1.5 sm:p-1">
->>>>>>> phase2Code
                              <Trash2 size={16} />
                            </button>
                         </div>
