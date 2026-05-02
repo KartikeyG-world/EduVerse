@@ -18,7 +18,7 @@ const skillSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['video', 'playlist'],
+    enum: ['video', 'playlist', 'documentation'],
     default: 'video',
   },
   source: {

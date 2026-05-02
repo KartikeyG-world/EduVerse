@@ -93,40 +93,42 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Skill Name */}
-            <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                Skill Name
-              </label>
-              <div className="relative">
-                <BookOpen size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" />
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. React 19 Server Components"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm placeholder-gray-600"
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Skill Name */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  Skill Name
+                </label>
+                <div className="relative">
+                  <BookOpen size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" />
+                  <input
+                    type="text"
+                    required
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. React 19 Server Components"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm placeholder-gray-600"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Category */}
-            <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                Category
-              </label>
-              <div className="relative">
-                <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" />
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm appearance-none cursor-pointer"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c} className="bg-[#0b1120]">{c}</option>
-                  ))}
-                </select>
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                  Category
+                </label>
+                <div className="relative">
+                  <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" />
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm appearance-none cursor-pointer"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c} className="bg-[#0b1120]">{c}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

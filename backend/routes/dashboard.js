@@ -4,6 +4,7 @@ const { protect, optionalAuth } = require("../middlewares/auth");
 const Activity = require("../models/Activity");
 const Plan = require("../models/Plan");
 const axios = require("axios");
+const { updateStreak } = require("../utils/streak");
 
 // Re-using the robust OpenRouter proxy pattern
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -38,7 +39,7 @@ Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep
 // GET /api/dashboard
 router.get("/", optionalAuth, async (req, res) => {
   try {
-    const user = req.user;
+    let user = req.user;
 
     // Gracefully handle Native Guest Mode
     if (!user) {
@@ -53,6 +54,9 @@ router.get("/", optionalAuth, async (req, res) => {
         insight: "Preview Mode: Register natively to unlock structural analytical tracking arrays and start ranking up! 🧠✨"
       });
     }
+
+    // Update daily streak on dashboard load for authenticated users
+    user = await updateStreak(user);
 
     // 1. Calculate Last 7 Days Activity Array for the UI Recharts
     const sevenDaysAgo = new Date();

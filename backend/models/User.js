@@ -38,6 +38,9 @@ const userSchema = new mongoose.Schema({
   tutorPoints: {
     type: Number,
     default: 0,
+  },
+  lastActiveDate: {
+    type: Date,
   }
 });
 

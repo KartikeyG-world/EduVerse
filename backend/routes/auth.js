@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { protect } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
+const { updateStreak } = require("../utils/streak");
 
 // @route   POST /api/auth/register
 router.post("/register", async (req, res) => {
@@ -68,12 +69,15 @@ router.post("/login", async (req, res) => {
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
+    // Update streak on login
+    const updatedUser = await updateStreak(user);
+
     // Success login notification
     await createNotification(user._id, 'LOGIN', `Welcome back to EduVerse! Your session has been established.`);
 
     res.json({ 
        token, 
-       user: { id: user._id, name: user.name, email: user.email, xp: user.xp, level: user.level, streak: user.streak, tutorPoints: user.tutorPoints } 
+       user: { id: updatedUser._id, name: updatedUser.name, email: updatedUser.email, xp: updatedUser.xp, level: updatedUser.level, streak: updatedUser.streak, tutorPoints: updatedUser.tutorPoints } 
     });
   } catch (err) {
     console.error("Login error:", err);

@@ -23,6 +23,21 @@ const planSchema = new mongoose.Schema({
       day: Number,
       topic: String,
       tasks: [String],
+      timeEstimate: String,
+      resources: {
+        youtube: [
+          {
+            title: String,
+            url: String,
+          }
+        ],
+        articles: [
+          {
+            title: String,
+            url: String,
+          }
+        ],
+      }
     }
   ],
   createdAt: {

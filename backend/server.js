@@ -20,6 +20,7 @@ app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/tutor", require("./routes/tutor"));
 app.use("/api/skills", require("./routes/skills"));
 app.use("/api/discover", require("./routes/discover"));
+app.use("/api/skillhub", require("./routes/skillHub"));
 
 const PORT = process.env.PORT || 5000;
 

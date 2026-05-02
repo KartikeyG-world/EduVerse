@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './Sidebar';
@@ -25,6 +25,7 @@ const pageVariants = {
 
 const Layout = () => {
   const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden bg-dashboard top-0 left-0 w-full relative">
@@ -35,14 +36,14 @@ const Layout = () => {
       <ParticleBackground mode="ambient" />
 
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
 
       {/* Main content column */}
-      <div className="flex flex-col flex-1 w-full overflow-hidden relative z-10">
-        <Topbar />
+      <div className="flex flex-col flex-1 w-full overflow-hidden relative z-10 lg:ml-64">
+        <Topbar onMenuClick={() => setIsMobileMenuOpen(true)} />
 
         {/* Scrollable page area with animated route transitions */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 text-white relative">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 text-white relative">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}

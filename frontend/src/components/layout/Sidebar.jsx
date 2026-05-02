@@ -1,9 +1,9 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Clock, FileText, Code,
   BarChart3, MessageSquare, CreditCard, GraduationCap,
-  LogOut, User, Flame, Zap,
+  LogOut, User, Flame, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../../context/AuthContext';
@@ -20,34 +20,56 @@ const NAV_LINKS = [
   { name: 'AI Chatbot',     path: '/chat',    icon: <MessageSquare size={18} /> },
 ];
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const { user, isGuest, logout, setShowAuthModal } = useContext(AuthContext);
 
-  return (
+  // Auto close sidebar on desktop breakpoint to reset state
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024 && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isOpen, onClose]);
+
+  const sidebarContent = (
     <motion.div
-      initial={{ x: -20, opacity: 0 }}
+      initial={{ x: -256, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="w-64 flex-shrink-0 h-full border-r border-white/[0.06] flex flex-col pt-6 z-20 relative"
+      exit={{ x: -256, opacity: 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="w-64 flex-shrink-0 h-full border-r border-white/[0.06] flex flex-col pt-6 z-50 fixed lg:static top-0 left-0 bottom-0"
       style={{ background: 'rgba(6,10,26,0.85)', backdropFilter: 'blur(20px)' }}
     >
       {/* Logo */}
-      <div className="px-6 mb-8">
-        <motion.h1
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="text-2xl font-black neon-text tracking-wider"
+      <div className="px-6 mb-8 flex items-center justify-between">
+        <div>
+          <motion.h1
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="text-xl md:text-2xl font-black neon-text tracking-wider"
+          >
+            EduVerse AI
+          </motion.h1>
+          <p className="text-[10px] sm:text-xs text-gray-500 mt-1 tracking-widest uppercase font-semibold">
+            Premium Learning
+          </p>
+        </div>
+        
+        {/* Mobile Close Button */}
+        <button 
+          onClick={onClose} 
+          className="lg:hidden p-2 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 hover:text-white transition-colors"
         >
-          EduVerse AI
-        </motion.h1>
-        <p className="text-xs text-gray-500 mt-1 tracking-widest uppercase font-semibold">
-          Premium Learning
-        </p>
+          <X size={20} />
+        </button>
       </div>
 
       {/* Nav links */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-hide">
         {NAV_LINKS.map((link, i) => (
           <motion.div
             key={link.name}
@@ -58,8 +80,9 @@ const Sidebar = () => {
             <NavLink
               to={link.path}
               end={link.path === '/'}
+              onClick={onClose} // Auto-close on mobile
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden group text-sm font-medium ${
+                `flex items-center gap-3 px-4 py-3 lg:py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden group text-sm font-medium ${
                   isActive
                     ? 'text-white'
                     : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
@@ -86,13 +109,13 @@ const Sidebar = () => {
                   </span>
 
                   {/* Label */}
-                  <span className="relative z-10">{link.name}</span>
+                  <span className="relative z-10 truncate">{link.name}</span>
 
                   {/* Active right indicator */}
                   {isActive && (
                     <motion.span
                       layoutId="active-nav-dot"
-                      className="ml-auto relative z-10 w-1.5 h-1.5 rounded-full bg-primary"
+                      className="ml-auto relative z-10 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
                     />
                   )}
                 </>
@@ -116,36 +139,42 @@ const Sidebar = () => {
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => setShowAuthModal(true)}
-              className="w-full text-xs font-bold btn-primary py-2"
+              onClick={() => {
+                onClose();
+                setShowAuthModal(true);
+              }}
+              className="w-full text-xs font-bold btn-primary py-3 lg:py-2 min-h-[44px]"
             >
               Create Account
             </motion.button>
           </div>
         ) : (
-          <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.07] relative group">
+          <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.07] relative group overflow-hidden">
             {/* Subtle hover glow */}
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
             <p className="text-xs text-gray-500 mb-0.5 truncate">Signed in as</p>
-            <p className="text-sm font-bold text-white truncate mb-3">
+            <p className="text-sm font-bold text-white truncate mb-3" title={user?.name}>
               {user?.name?.split(' ')[0] || 'Student'}
             </p>
 
             <div className="flex items-center justify-between">
               {/* Streak */}
               <div className="flex items-center gap-1.5 text-orange-400">
-                <Flame size={14} />
+                <Flame size={14} className="flex-shrink-0" />
                 <span className="text-sm font-bold">{user?.streak || 0}</span>
-                <span className="text-xs text-gray-500">day streak</span>
+                <span className="text-xs text-gray-500 truncate">streak</span>
               </div>
 
               {/* Logout */}
               <motion.button
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.93 }}
-                onClick={logout}
-                className="text-red-400 hover:text-red-300 p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
+                onClick={() => {
+                  onClose();
+                  logout();
+                }}
+                className="text-red-400 hover:text-red-300 p-2 lg:p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors flex-shrink-0 flex items-center justify-center min-h-[36px] min-w-[36px] lg:min-h-0 lg:min-w-0"
                 title="Logout"
               >
                 <LogOut size={15} />
@@ -155,6 +184,36 @@ const Sidebar = () => {
         )}
       </motion.div>
     </motion.div>
+  );
+
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Render sidebar always on desktop (lg:), and conditionally on mobile */}
+      <div className="hidden lg:block lg:fixed lg:top-0 lg:left-0 lg:bottom-0 lg:z-20">
+        {sidebarContent}
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <div className="lg:hidden">
+            {sidebarContent}
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

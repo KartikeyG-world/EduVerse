@@ -3,6 +3,7 @@ const router = express.Router();
 const Plan = require("../models/Plan");
 const { protect, optionalAuth } = require("../middlewares/auth");
 const axios = require("axios");
+const { fetchResourcesForTopic } = require("../utils/resources");
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -58,26 +59,57 @@ router.post("/planner", protect, async (req, res) => {
   try {
     const { subject, durationDays, goal } = req.body;
 
+    // Step 1: Generate structured plan from AI
     const messages = [
       {
         role: "system",
-        content: "You are an expert tutor. Create study roadmaps in pure valid JSON."
+        content: "You are an expert tutor and curriculum designer. Create detailed, progressive study roadmaps in pure valid JSON. Topics must progress from beginner to advanced."
       },
       {
         role: "user",
-        content: `Create a study roadmap for ${subject} over ${durationDays} days with the goal of: ${goal}. Format it clearly with daily tasks. Respond ONLY with valid JSON with this exact structure: { "roadmap": [ { "day": 1, "topic": "...", "tasks": ["..."] } ] }`
+        content: `Create a study roadmap for "${subject}" over ${durationDays} days with the goal: "${goal}".
+Each day must cover a specific subtopic with concrete tasks and a realistic time estimate.
+Respond ONLY with valid JSON in this exact structure:
+{
+  "roadmap": [
+    {
+      "day": 1,
+      "topic": "Specific Subtopic Name",
+      "timeEstimate": "2 hours",
+      "tasks": ["Task 1", "Task 2", "Task 3"]
+    }
+  ]
+}`
       }
     ];
 
     const contentText = await openRouterCall(messages);
     const parsedContent = parseJSONSafely(contentText);
 
+    if (!parsedContent.roadmap || !Array.isArray(parsedContent.roadmap)) {
+      throw new Error("AI returned invalid roadmap structure");
+    }
+
+    // Step 2: Fetch YouTube + article resources for all days in parallel
+    const enrichedRoadmap = await Promise.all(
+      parsedContent.roadmap.map(async (day) => {
+        try {
+          const resources = await fetchResourcesForTopic(day.topic, subject);
+          return { ...day, resources };
+        } catch (err) {
+          console.warn(`Resource fetch failed for Day ${day.day}:`, err.message);
+          return { ...day, resources: { youtube: [], articles: [] } };
+        }
+      })
+    );
+
+    // Step 3: Save enriched plan to DB
     const newPlan = new Plan({
       userId: req.user._id,
       subject,
       durationDays,
       goal,
-      roadmap: parsedContent.roadmap
+      roadmap: enrichedRoadmap
     });
     const savedPlan = await newPlan.save();
     
