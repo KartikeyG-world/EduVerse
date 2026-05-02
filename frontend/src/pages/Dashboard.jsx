@@ -346,6 +346,7 @@ const Dashboard = () => {
         </div>
         </div>
       </ParallaxLayer>
+
     </motion.div>
   );
 };

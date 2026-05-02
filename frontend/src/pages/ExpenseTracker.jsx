@@ -228,6 +228,7 @@ const ExpenseTracker = () => {
           </div>
         </ScrollReveal>
       </div>
+
     </div>
   );
 };

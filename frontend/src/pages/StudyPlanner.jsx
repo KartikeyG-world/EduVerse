@@ -380,6 +380,7 @@ const StudyPlanner = () => {
         onClose={() => setIsPreviewOpen(false)} 
         source={previewSource} 
       />
+
     </div>
   );
 };

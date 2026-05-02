@@ -16,6 +16,24 @@ const Chatbot = () => {
   const inputRef = useRef(null);
 
   useEffect(() => {
+    fetchHistory();
+  }, []);
+
+  const fetchHistory = async () => {
+    try {
+      const res = await api.get('/ai/chat/history');
+      if (res.data.success && res.data.messages.length > 0) {
+        setMessages(res.data.messages.map(m => ({
+          role: m.role,
+          content: m.content
+        })));
+      }
+    } catch (err) {
+      console.error('Failed to load chat history', err);
+    }
+  };
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }

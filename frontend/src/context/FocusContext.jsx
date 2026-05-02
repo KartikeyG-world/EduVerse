@@ -40,6 +40,13 @@ export const FocusProvider = ({ children }) => {
         const res = await api.put('/users/add-xp', { xpToAdd: xpToEarn, focusSeconds: secondsFocused });
         updateUser({ streak: res.data.streak });
       }
+
+      // Save focus session to DB
+      await api.post('/focus', {
+        type: timerTypeRef.current,
+        duration: secondsFocused,
+        xpEarned: xpToEarn
+      });
       
       // Always trigger feedback so the event flow completes regardless of XP gained
       triggerFeedback({
