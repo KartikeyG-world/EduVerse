@@ -17,7 +17,7 @@ const StudyPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
-  const { requireAuth } = useContext(AuthContext);
+  const { requireAuth, isAuthenticated } = useContext(AuthContext);
 
   // Source Preview Modal State
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -41,8 +41,9 @@ const StudyPlanner = () => {
   });
 
   useEffect(() => {
+    if (!isAuthenticated) return; // Guests see an empty plan history — no API call
     fetchSavedPlans();
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem('eduverse_daily_routine', JSON.stringify(routine));
@@ -60,7 +61,9 @@ const StudyPlanner = () => {
       const res = await api.get('/ai/planner');
       setSavedPlans(res.data);
     } catch (err) {
-      console.error('Failed to load past plans');
+      if (err.response?.status !== 401) {
+        console.error('Failed to load past plans');
+      }
     }
   };
 

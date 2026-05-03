@@ -38,7 +38,7 @@ const AnimatedCounter = ({ end, duration = 2000 }) => {
 export default function Tutor() {
   const [role, setRole] = useState('student');
   const { triggerFeedback } = useContext(CompanionContext);
-  const { user, updateUser, requireAuth } = useContext(AuthContext);
+  const { user, updateUser, requireAuth, isAuthenticated } = useContext(AuthContext);
 
   const [stats, setStats] = useState({ totalPosted: 0, totalSolved: 0, totalPoints: 0 });
 
@@ -56,20 +56,23 @@ export default function Tutor() {
 
   // Fetch logic
   useEffect(() => {
+     if (!isAuthenticated) return;
      fetchStats();
      if (role === 'student') {
         fetchMyProblems();
      } else {
         fetchTeacherProblems();
      }
-  }, [role, teacherSubject]);
+  }, [role, teacherSubject, isAuthenticated]);
 
   const fetchStats = async () => {
      try {
          const res = await api.get('/tutor/stats');
          setStats(res.data);
      } catch (err) {
-         console.error("Failed to load stats", err);
+         if (err.response?.status !== 401) {
+            console.error("Failed to load stats", err);
+         }
      }
   };
 
@@ -78,8 +81,10 @@ export default function Tutor() {
       const res = await api.get('/tutor/my-problems');
       setMyProblems(res.data);
     } catch (err) {
-      console.error(err);
-      triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Failed to load your problems" } });
+      if (err.response?.status !== 401) {
+        console.error(err);
+        triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Failed to load your problems" } });
+      }
     }
   };
 
@@ -88,8 +93,10 @@ export default function Tutor() {
       const res = await api.get(`/tutor/problems?subject=${teacherSubject}`);
       setTeacherProblems(res.data);
     } catch (err) {
-      console.error(err);
-      triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Failed to load server problems" } });
+      if (err.response?.status !== 401) {
+        console.error(err);
+        triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Failed to load server problems" } });
+      }
     }
   };
 
@@ -258,12 +265,26 @@ export default function Tutor() {
                     <Activity size={20}/> My Active Threads
                  </h2>
                  
-                 <ScrollRevealGroup stagger={0.08} className="grid grid-cols-1 gap-4">
-                     {myProblems.length === 0 ? (
-                         <div className="glass p-8 text-center text-gray-400 rounded-xl border border-white/5 border-dashed">
-                             No queries requested structurally yet!
-                         </div>
-                     ) : myProblems.map(prob => (
+                  <ScrollRevealGroup stagger={0.08} className="grid grid-cols-1 gap-4">
+                      {!isAuthenticated ? (
+                          <div className="glass p-12 text-center space-y-4 rounded-2xl border border-white/5 border-dashed">
+                              <GraduationCap size={48} className="mx-auto text-gray-600 mb-2" />
+                              <h3 className="text-xl font-bold text-white">Join the Network</h3>
+                              <p className="text-gray-400 max-w-md mx-auto text-sm">
+                                  Sign in to post your academic queries or earn XP by solving problems for peers in the Global Tutor Network.
+                              </p>
+                              <button 
+                                onClick={() => requireAuth(() => {})}
+                                className="mt-4 px-8 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all"
+                              >
+                                Sign In / Register
+                              </button>
+                          </div>
+                      ) : myProblems.length === 0 ? (
+                          <div className="glass p-8 text-center text-gray-400 rounded-xl border border-white/5 border-dashed">
+                              No queries requested structurally yet!
+                          </div>
+                      ) : myProblems.map(prob => (
                          <div key={prob._id} className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                              <div className="flex justify-between items-start">
                                  <div>

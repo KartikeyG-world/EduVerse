@@ -5,8 +5,11 @@ const { protect } = require("../middlewares/auth");
 
 // ROUTE 1 — GET /api/notes
 // Fetch ALL notes belonging to req.user.id
-router.get("/", protect, async (req, res) => {
+router.get("/", optionalAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.json({ success: true, notes: [] });
+    }
     const notes = await Note.find({ user: req.user.id }).sort({ lastEditedAt: -1 });
     res.json({ success: true, notes });
   } catch (err) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Skill = require('../models/Skill');
-const { protect } = require('../middlewares/auth');
+const { protect, optionalAuth } = require('../middlewares/auth');
 const { createNotification } = require('../utils/notification');
 const QuizAttempt = require('../models/QuizAttempt');
 const ytpl = require('ytpl');
@@ -129,8 +129,11 @@ router.get('/search', protect, async (req, res) => {
 
 // @route   GET /api/skills
 // @desc    Get all skills for the authenticated user (sorted by lastWatched, then newest first)
-router.get('/', protect, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.json({ success: true, skills: [] });
+    }
     const skills = await Skill.find({ userId: req.user.id }).sort({ lastWatched: -1, createdAt: -1 });
     res.json(skills);
   } catch (err) {

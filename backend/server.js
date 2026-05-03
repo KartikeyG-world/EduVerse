@@ -2,15 +2,24 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
 // Middleware
+app.use(helmet());
 app.use(express.json());
 app.use(cors());
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many requests, please try again later" }
+});
+
 // Routes
-app.use("/api/auth", require("./routes/auth"));
+app.use("/api/auth", authLimiter, require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/notes", require("./routes/notes"));
 app.use("/api/expenses", require("./routes/expenses"));

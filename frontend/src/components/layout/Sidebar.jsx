@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { name: 'Analytics',      path: '/analytics', icon: <BarChart3 size={18} /> },
   { name: 'Expense Tracker',path: '/expenses', icon: <CreditCard size={18} /> },
   { name: 'AI Chatbot',     path: '/chat',    icon: <MessageSquare size={18} /> },
+  { name: 'Profile',        path: '/profile', icon: <User size={18} /> },
 ];
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -136,17 +137,28 @@ const Sidebar = ({ isOpen, onClose }) => {
           <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.07] text-center">
             <User size={28} className="mx-auto mb-2 text-gray-500" />
             <p className="text-sm font-bold text-white mb-3">Exploring as Guest</p>
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                onClose();
-                setShowAuthModal(true);
-              }}
-              className="w-full text-xs font-bold btn-primary py-3 lg:py-2 min-h-[44px]"
-            >
-              Create Account
-            </motion.button>
+            <div className="grid grid-cols-1 gap-2">
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  onClose();
+                  setShowAuthModal(true);
+                }}
+                className="w-full text-xs font-bold btn-primary py-3 lg:py-2 min-h-[44px]"
+              >
+                Create Account
+              </motion.button>
+              <button
+                onClick={() => {
+                  onClose();
+                  window.location.href = '/login';
+                }}
+                className="w-full text-xs font-bold text-gray-400 hover:text-white transition-colors py-2"
+              >
+                Sign In to Existing
+              </button>
+            </div>
           </div>
         ) : (
           <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.07] relative group overflow-hidden">
@@ -154,9 +166,11 @@ const Sidebar = ({ isOpen, onClose }) => {
             <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
             <p className="text-xs text-gray-500 mb-0.5 truncate">Signed in as</p>
-            <p className="text-sm font-bold text-white truncate mb-3" title={user?.name}>
-              {user?.name?.split(' ')[0] || 'Student'}
-            </p>
+            <NavLink to="/profile" onClick={onClose} className="block group/link">
+              <p className="text-sm font-bold text-white truncate mb-3 group-hover/link:text-primary transition-colors" title={user?.name}>
+                {user?.name?.split(' ')[0] || 'Student'}
+              </p>
+            </NavLink>
 
             <div className="flex items-center justify-between">
               {/* Streak */}

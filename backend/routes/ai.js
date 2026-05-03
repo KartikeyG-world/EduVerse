@@ -216,8 +216,11 @@ router.post("/chat", protect, async (req, res) => {
 });
 
 // GET Chat History
-router.get("/chat/history", protect, async (req, res) => {
+router.get("/chat/history", optionalAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.json({ success: true, history: [] });
+    }
     const ChatMessage = require("../models/ChatMessage");
     const messages = await ChatMessage.find({ user: req.user.id })
       .sort({ timestamp: 1 })

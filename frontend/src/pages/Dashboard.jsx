@@ -70,7 +70,15 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
   const { triggerFeedback } = useContext(CompanionContext);
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => setChartReady(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
 
   const fetchDashboard = async () => {
     try {
@@ -83,7 +91,9 @@ const Dashboard = () => {
         data: { name: user?.name } 
       });
     } catch (err) {
-      console.error('Failed to load dashboard data', err);
+      if (err.response?.status !== 401) {
+        console.error('Failed to load dashboard data', err);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -261,33 +271,35 @@ const Dashboard = () => {
           </div>
           
           <div className="w-full h-[200px] sm:h-[250px] md:h-[300px] lg:h-[320px] mt-2 sm:mt-4 ml-0 md:-ml-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                  itemStyle={{ color: '#fff' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="studyTime" 
-                  name="Study Minutes"
-                  stroke="var(--primary)" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorStudy)" 
-                  animationDuration={2000}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartReady && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="studyTime" 
+                    name="Study Minutes"
+                    stroke="var(--primary)" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorStudy)" 
+                    animationDuration={2000}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </ScrollReveal>
 

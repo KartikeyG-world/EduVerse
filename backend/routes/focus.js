@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const FocusSession = require("../models/FocusSession");
 const User = require("../models/User");
-const { protect } = require("../middlewares/auth");
+const { protect, optionalAuth } = require("../middlewares/auth");
 
 // Log a new focus session
 router.post("/", protect, async (req, res) => {
@@ -32,8 +32,11 @@ router.post("/", protect, async (req, res) => {
 });
 
 // Get user's focus history
-router.get("/history", protect, async (req, res) => {
+router.get("/history", optionalAuth, async (req, res) => {
   try {
+    if (!req.user) {
+      return res.json({ success: true, history: [] });
+    }
     const sessions = await FocusSession.find({ user: req.user.id })
       .sort({ startTime: -1 })
       .limit(50);

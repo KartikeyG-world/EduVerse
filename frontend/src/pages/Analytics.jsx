@@ -8,12 +8,13 @@ import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import ParallaxLayer from '../components/ui/ParallaxLayer';
 
 const Analytics = () => {
-  const { user } = useContext(AuthContext);
+  const { user, isAuthenticated } = useContext(AuthContext);
   const [stats, setStats] = useState({ xp: 0, level: 1, streak: 0, focusHours: 0 });
   const [activityData, setActivityData] = useState([]);
 
   useEffect(() => {
-    const loadData = async () => {
+    if (!isAuthenticated) return; // guests see zero-state, no API call
+    const fetchStats = async () => {
       try {
         const [statsRes, historyRes] = await Promise.all([
           api.get('/users/me'),
@@ -46,11 +47,13 @@ const Analytics = () => {
           setActivityData(chartData);
         }
       } catch (err) {
-        console.error('Failed to load analytics data', err);
+        if (err.response?.status !== 401) {
+          console.error('Failed to load stats', err);
+        }
       }
     };
-    loadData();
-  }, []);
+    fetchStats();
+  }, [isAuthenticated]);
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
