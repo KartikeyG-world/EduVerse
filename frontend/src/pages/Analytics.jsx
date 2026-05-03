@@ -10,13 +10,42 @@ import ParallaxLayer from '../components/ui/ParallaxLayer';
 const Analytics = () => {
   const { user, isAuthenticated } = useContext(AuthContext);
   const [stats, setStats] = useState({ xp: 0, level: 1, streak: 0, focusHours: 0 });
+  const [activityData, setActivityData] = useState([]);
 
   useEffect(() => {
     if (!isAuthenticated) return; // guests see zero-state, no API call
     const fetchStats = async () => {
       try {
-        const res = await api.get('/users/me');
-        setStats(res.data);
+        const [statsRes, historyRes] = await Promise.all([
+          api.get('/users/me'),
+          api.get('/focus/history')
+        ]);
+        
+        setStats(statsRes.data);
+        
+        // Process real history data for the chart
+        if (historyRes.data.success) {
+          const sessions = historyRes.data.sessions;
+          const chartData = [];
+          
+          for(let i=6; i>=0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+            
+            // Sum XP for this day
+            const dayXP = sessions.filter(s => {
+              const sessionDate = new Date(s.startTime);
+              return sessionDate.toDateString() === d.toDateString();
+            }).reduce((sum, s) => sum + (s.xpEarned || 0), 0);
+
+            chartData.push({
+              name: dayName,
+              xp: dayXP
+            });
+          }
+          setActivityData(chartData);
+        }
       } catch (err) {
         if (err.response?.status !== 401) {
           console.error('Failed to load stats', err);
@@ -25,29 +54,6 @@ const Analytics = () => {
     };
     fetchStats();
   }, [isAuthenticated]);
-
-  // Mock data for the chart to represent XP gained over the last 7 days
-  // In a real app, this would be computed from a TimeSeries DB or a separate Activity model
-  const getActivityData = () => {
-    const data = [];
-    const baseXP = Math.max(0, stats.xp - 500); // simulate climbing up to current XP
-    
-    for(let i=6; i>=0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      data.push({
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        xp: baseXP + (50 * (7-i)) + Math.floor(Math.random() * 50)
-      });
-    }
-    // Ensure last data point roughly matches current XP if it's high enough, else just show the curve
-    if (data.length > 0) {
-      data[data.length - 1].xp = stats.xp;
-    }
-    return data;
-  };
-
-  const activityData = getActivityData();
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
