@@ -70,7 +70,15 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
   const { triggerFeedback } = useContext(CompanionContext);
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => setChartReady(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
 
   const fetchDashboard = async () => {
     try {
@@ -83,7 +91,9 @@ const Dashboard = () => {
         data: { name: user?.name } 
       });
     } catch (err) {
-      console.error('Failed to load dashboard data', err);
+      if (err.response?.status !== 401) {
+        console.error('Failed to load dashboard data', err);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -143,22 +153,6 @@ const Dashboard = () => {
       animate="show"
     >
       {/* Header Area */}
-<<<<<<< HEAD
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold flex items-center gap-3">
-             Welcome back, {user?.name?.split(' ')[0] || 'Student'}! 👋
-          </h2>
-          <p className="text-gray-400 mt-1 flex items-center gap-2">
-             You are tracking <strong className="text-white">live analytics</strong> for your session.
-          </p>
-        </div>
-        <PremiumButton>
-          <button 
-            onClick={fetchDashboard}
-            disabled={refreshing}
-            className="flex items-center gap-2 bg-surface hover:bg-white/5 border border-white/10 px-4 py-2 rounded-xl transition-all text-sm font-medium"
-=======
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold flex items-center gap-3">
@@ -173,7 +167,6 @@ const Dashboard = () => {
             onClick={fetchDashboard}
             disabled={refreshing}
             className="w-full sm:w-auto flex items-center justify-center gap-2 bg-surface hover:bg-white/5 border border-white/10 px-4 py-2 sm:py-2.5 rounded-xl transition-all text-sm font-medium"
->>>>>>> phase2Code
           >
             <RefreshCw size={16} className={`${refreshing ? 'animate-spin text-primary' : 'text-gray-400'}`} /> 
             Refresh Data
@@ -183,36 +176,20 @@ const Dashboard = () => {
 
       {/* Top Stats Grid */}
       <ParallaxLayer depth={0.03}>
-<<<<<<< HEAD
-        <ScrollRevealGroup stagger={0.1} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Streak Card */}
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-orange-500/30 transition-colors relative overflow-hidden rounded-2xl p-6">
-=======
         <ScrollRevealGroup stagger={0.1} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         
         {/* Streak Card */}
         <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-orange-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
->>>>>>> phase2Code
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Active Streak</h3>
-<<<<<<< HEAD
-              <div className="mt-2 text-4xl font-black text-white flex items-end gap-2">
-                <AnimatedCounter end={stats.streak} duration={1500} /> <span className="text-lg font-medium text-gray-500 mb-1">days</span>
-              </div>
-            </div>
-            <div className="p-3 bg-orange-500/10 rounded-xl">
-               <Flame size={24} className="text-orange-500 animate-pulse drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]" />
-=======
               <div className="mt-2 text-3xl md:text-4xl font-black text-white flex items-end gap-2">
                 <AnimatedCounter end={stats.streak} duration={1500} /> <span className="text-base md:text-lg font-medium text-gray-500 mb-1">days</span>
               </div>
             </div>
             <div className="p-2.5 md:p-3 bg-orange-500/10 rounded-xl">
                <Flame size={20} className="md:w-6 md:h-6 text-orange-500 animate-pulse drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]" />
->>>>>>> phase2Code
             </div>
           </div>
           <div className="w-full bg-surface h-1.5 rounded-full overflow-hidden mt-2">
@@ -223,37 +200,21 @@ const Dashboard = () => {
                className="bg-gradient-to-r from-orange-400 to-red-500 h-full rounded-full"
             ></motion.div>
           </div>
-<<<<<<< HEAD
-          <p className="text-xs text-orange-400/80 mt-3 flex items-center gap-1"><Zap size={14}/> Maintaining daily momentum</p>
-        </div>
-
-        {/* Level Card */}
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-primary/30 transition-colors relative overflow-hidden rounded-2xl p-6">
-=======
           <p className="text-[10px] md:text-xs text-orange-400/80 mt-3 flex items-center gap-1"><Zap size={14}/> Maintaining daily momentum</p>
         </div>
 
         {/* Level Card */}
         <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-primary/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
->>>>>>> phase2Code
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Rank Progress</h3>
               <div className="flex items-end gap-3 mt-2">
-<<<<<<< HEAD
-                <span className="text-4xl font-black neon-text">Lv. <AnimatedCounter end={stats.level} duration={1000} /></span>
-              </div>
-            </div>
-            <div className="p-3 bg-primary/10 rounded-xl">
-               <Target size={24} className="text-primary drop-shadow-[0_0_10px_rgba(var(--primary),0.8)]" />
-=======
                 <span className="text-3xl md:text-4xl font-black neon-text">Lv. <AnimatedCounter end={stats.level} duration={1000} /></span>
               </div>
             </div>
             <div className="p-2.5 md:p-3 bg-primary/10 rounded-xl">
                <Target size={20} className="md:w-6 md:h-6 text-primary drop-shadow-[0_0_10px_rgba(var(--primary),0.8)]" />
->>>>>>> phase2Code
             </div>
           </div>
           <div className="w-full bg-surface h-1.5 rounded-full overflow-hidden mt-2">
@@ -264,37 +225,18 @@ const Dashboard = () => {
               className="bg-gradient-to-r from-primary to-accent h-full rounded-full"
             ></motion.div>
           </div>
-<<<<<<< HEAD
-          <div className="flex justify-between items-center text-xs mt-3">
-=======
           <div className="flex justify-between items-center text-[10px] md:text-xs mt-3">
->>>>>>> phase2Code
              <span className="text-primary font-medium">{getLevelTitle(stats.level)}</span>
              <span className="text-gray-500">{1000 - currentLevelXP} XP to go</span>
           </div>
         </div>
 
         {/* Focus Hours Card */}
-<<<<<<< HEAD
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-blue-500/30 transition-colors relative overflow-hidden rounded-2xl p-6">
-=======
         <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-blue-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6 md:col-span-2 lg:col-span-1">
->>>>>>> phase2Code
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Deep Work Time</h3>
-<<<<<<< HEAD
-              <div className="mt-2 text-4xl font-black text-white flex items-end gap-2">
-                <AnimatedCounter end={stats.focusHours} duration={2000} /> <span className="text-lg font-medium text-gray-500 mb-1">hrs</span>
-              </div>
-            </div>
-            <div className="p-3 bg-blue-500/10 rounded-xl">
-               <Clock size={24} className="text-blue-500 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-4 text-sm text-gray-400">
-=======
               <div className="mt-2 text-3xl md:text-4xl font-black text-white flex items-end gap-2">
                 <AnimatedCounter end={stats.focusHours} duration={2000} /> <span className="text-base md:text-lg font-medium text-gray-500 mb-1">hrs</span>
               </div>
@@ -304,7 +246,6 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 mt-4 text-[10px] md:text-sm text-gray-400">
->>>>>>> phase2Code
              <Activity size={16} className="text-emerald-400" /> Lifetime focus metrics
           </div>
         </div>
@@ -316,17 +257,6 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* BIG CHART AREA */}
-<<<<<<< HEAD
-        <ScrollReveal delay={0.3} className="lg:col-span-2 glass-next-gen dynamic-lighting p-6 flex flex-col min-h-[400px] rounded-2xl">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                 <Activity size={18} className="text-primary"/> 7-Day Activity Pipeline
-              </h3>
-              <p className="text-sm text-gray-400">Total deep focus minutes per day</p>
-            </div>
-            <div className="px-3 py-1 bg-surface rounded-md text-xs font-medium text-gray-300 border border-white/5">
-=======
         <ScrollReveal delay={0.3} className="lg:col-span-2 glass-next-gen dynamic-lighting p-4 sm:p-6 flex flex-col min-h-[250px] md:min-h-[350px] lg:min-h-[400px] rounded-2xl">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -336,43 +266,40 @@ const Dashboard = () => {
               <p className="text-xs md:text-sm text-gray-400">Total deep focus minutes per day</p>
             </div>
             <div className="px-2 md:px-3 py-1 bg-surface rounded-md text-[10px] md:text-xs font-medium text-gray-300 border border-white/5">
->>>>>>> phase2Code
                 Past Week
             </div>
           </div>
           
-<<<<<<< HEAD
-          <div className="w-full h-[300px] md:h-[350px] lg:h-[400px] mt-4 -ml-4">
-=======
           <div className="w-full h-[200px] sm:h-[250px] md:h-[300px] lg:h-[320px] mt-2 sm:mt-4 ml-0 md:-ml-4">
->>>>>>> phase2Code
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                  itemStyle={{ color: '#fff' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="studyTime" 
-                  name="Study Minutes"
-                  stroke="var(--primary)" 
-                  strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorStudy)" 
-                  animationDuration={2000}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {chartReady && (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="studyTime" 
+                    name="Study Minutes"
+                    stroke="var(--primary)" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorStudy)" 
+                    animationDuration={2000}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </ScrollReveal>
 
@@ -380,11 +307,7 @@ const Dashboard = () => {
         <div className="space-y-6">
           
           {/* AI Insights Card */}
-<<<<<<< HEAD
-          <ScrollReveal delay={0.4} className="glass flex flex-col p-6 rounded-2xl border-t-2 border-primary/50 relative overflow-hidden group">
-=======
           <ScrollReveal delay={0.4} className="glass flex flex-col p-4 sm:p-6 rounded-2xl border-t-2 border-primary/50 relative overflow-hidden group">
->>>>>>> phase2Code
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full pointer-events-none"></div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-primary text-sm font-bold uppercase tracking-wider flex items-center gap-2">
@@ -392,21 +315,13 @@ const Dashboard = () => {
               </h3>
               <Sparkles size={16} className="text-accent animate-pulse" />
             </div>
-<<<<<<< HEAD
-            <div className="text-lg font-medium text-gray-200 mt-2 min-h-[80px]">
-=======
             <div className="text-base sm:text-lg font-medium text-gray-200 mt-2 min-h-[80px]">
->>>>>>> phase2Code
               <TypewriterText text={insight} />
             </div>
             <PremiumButton className="w-full">
               <button 
                 onClick={() => navigate('/planner', { state: { fromDashboard: true } })}
-<<<<<<< HEAD
-                className="w-full bg-surface hover:bg-white/5 border border-white/10 text-white rounded-xl py-2.5 mt-4 transition-colors font-medium flex items-center justify-center gap-2 text-sm group-hover:border-primary/30"
-=======
                 className="w-full bg-surface hover:bg-white/5 border border-white/10 text-white rounded-xl py-3 sm:py-2.5 mt-4 transition-colors font-medium flex items-center justify-center gap-2 text-sm group-hover:border-primary/30 min-h-[44px]"
->>>>>>> phase2Code
               >
                  Open Planner <ArrowRight size={14}/>
               </button>
@@ -414,22 +329,14 @@ const Dashboard = () => {
           </ScrollReveal>
 
           {/* Weak vs Strong Card */}
-<<<<<<< HEAD
-          <ScrollReveal delay={0.5} className="glass-next-gen dynamic-lighting p-6 rounded-2xl">
-=======
           <ScrollReveal delay={0.5} className="glass-next-gen dynamic-lighting p-4 sm:p-6 rounded-2xl">
->>>>>>> phase2Code
              <h3 className="text-sm font-bold text-gray-300 mb-5">Subject Performance</h3>
              
              <div className="space-y-5">
                <div>
                  <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-emerald-400 flex items-center gap-2"><TrendingUp size={14}/> Strongest</span>
-<<<<<<< HEAD
-                    <span className="text-xs text-gray-500 bg-surface px-2 py-0.5 rounded">{topics.strong}</span>
-=======
                     <span className="text-xs text-gray-500 bg-surface px-2 py-0.5 rounded max-w-[120px] truncate">{topics.strong}</span>
->>>>>>> phase2Code
                  </div>
                  <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
                     <motion.div initial={{width:0}} animate={{width:'85%'}} transition={{delay: 1, duration: 1.5}} className="bg-emerald-500 h-full rounded-full"></motion.div>
@@ -439,11 +346,7 @@ const Dashboard = () => {
                <div>
                  <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-red-400 flex items-center gap-2"><TrendingDown size={14}/> Needs Focus</span>
-<<<<<<< HEAD
-                    <span className="text-xs text-gray-500 bg-surface px-2 py-0.5 rounded">{topics.weak}</span>
-=======
                     <span className="text-xs text-gray-500 bg-surface px-2 py-0.5 rounded max-w-[120px] truncate">{topics.weak}</span>
->>>>>>> phase2Code
                  </div>
                  <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
                     <motion.div initial={{width:0}} animate={{width:'35%'}} transition={{delay: 1.2, duration: 1.5}} className="bg-red-500 h-full rounded-full"></motion.div>

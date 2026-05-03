@@ -168,6 +168,14 @@ router.post("/summarize", protect, async (req, res) => {
 router.post("/chat", protect, async (req, res) => {
   try {
     const { message, history } = req.body;
+    const ChatMessage = require("../models/ChatMessage");
+
+    // Save user message
+    await ChatMessage.create({
+      user: req.user.id,
+      role: "user",
+      content: message
+    });
 
     const messages = [
       {
@@ -189,6 +197,13 @@ router.post("/chat", protect, async (req, res) => {
 
     const replyText = await openRouterCall(messages);
     
+    // Save assistant reply
+    await ChatMessage.create({
+      user: req.user.id,
+      role: "assistant",
+      content: replyText
+    });
+
     // Log Activity
     const Activity = require("../models/Activity");
     await Activity.create({ userId: req.user._id, type: 'chat', duration: 0 });
@@ -197,6 +212,22 @@ router.post("/chat", protect, async (req, res) => {
   } catch (err) {
     console.error("AI Chatbot error:", err);
     res.status(500).json({ error: "Failed to get chatbot response" });
+  }
+});
+
+// GET Chat History
+router.get("/chat/history", optionalAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.json({ success: true, history: [] });
+    }
+    const ChatMessage = require("../models/ChatMessage");
+    const messages = await ChatMessage.find({ user: req.user.id })
+      .sort({ timestamp: 1 })
+      .limit(100);
+    res.json({ success: true, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "Failed to fetch chat history" });
   }
 });
 

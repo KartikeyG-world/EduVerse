@@ -11,9 +11,31 @@ const Chatbot = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const { requireAuth } = useContext(AuthContext);
+  const { requireAuth, isAuthenticated } = useContext(AuthContext);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return; // Skip for guests, history returns empty from backend anyway
+    fetchHistory();
+  }, [isAuthenticated]);
+
+  const fetchHistory = async () => {
+    try {
+      const res = await api.get('/ai/chat/history');
+      if (res.data.success && res.data.messages.length > 0) {
+        setMessages(res.data.messages.map(m => ({
+          role: m.role,
+          content: m.content
+        })));
+      }
+    } catch (err) {
+      // Silently handle — guests simply keep the welcome message
+      if (err.response?.status !== 401) {
+        console.error('Failed to load chat history', err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) {

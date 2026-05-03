@@ -134,6 +134,7 @@ const LearningView = () => {
   const isThisSessionActive = activeSessionId === sessionId;
 
   const { triggerFeedback } = useContext(CompanionContext);
+  const { isAuthenticated, requireAuth } = useContext(AuthContext);
 
   const playerRef      = useRef(null);   // YT.Player instance
   const containerRef   = useRef(null);   // div for player mount
@@ -187,6 +188,11 @@ const LearningView = () => {
   // ── Load skill from API ──
   useEffect(() => {
     const fetchSkill = async () => {
+      if (!isAuthenticated) {
+        setLoading(false);
+        setError("Please sign in to access this learning session.");
+        return;
+      }
       try {
         const res = await api.get(`/skills/${id}`);
         setSkill(res.data);
@@ -337,7 +343,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
 
   // ── Save progress to backend ──
   const saveProgress = useCallback(async (watched, total, completedVideoId = null) => {
-    if (progressRef.current.completed && !completedVideoId) return; // locked
+    if (!isAuthenticated || (progressRef.current.completed && !completedVideoId)) return; // locked or guest
 
     let body = {};
     if (skill?.type === 'playlist') {
@@ -547,15 +553,39 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
   if (error || !skill) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4 max-w-sm">
-          <AlertCircle size={40} className="text-red-400 mx-auto" />
-          <p className="text-white font-bold text-lg">{error || 'Skill not found'}</p>
-          <button
-            onClick={() => navigate('/skills')}
-            className="px-6 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary/80 transition-colors"
-          >
-            Back to Skills Hub
-          </button>
+        <div className="text-center space-y-4 max-w-sm px-6">
+          <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-red-400" />
+          </div>
+          <p className="text-white font-bold text-xl">{error || 'Skill not found'}</p>
+          <p className="text-gray-400 text-sm">
+            {!isAuthenticated 
+              ? "You must be logged in to view your learning sessions and track progress."
+              : "We couldn't find the requested skill or you don't have permission to view it."}
+          </p>
+          <div className="flex flex-col gap-3 pt-4">
+            {!isAuthenticated ? (
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+              >
+                Sign In to Continue
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/skills')}
+                className="w-full px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+              >
+                Back to Skills Hub
+              </button>
+            )}
+            <button
+              onClick={() => navigate('/')}
+              className="w-full px-6 py-3 bg-white/5 text-gray-400 rounded-xl font-medium hover:text-white hover:bg-white/10 transition-all"
+            >
+              Go to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
