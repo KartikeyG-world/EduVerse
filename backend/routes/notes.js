@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Note = require("../models/Note");
-const { protect, optionalAuth } = require("../middlewares/auth");
+const { protect } = require("../middlewares/auth");
 
 // ROUTE 1 — GET /api/notes
 // Fetch ALL notes belonging to req.user.id
