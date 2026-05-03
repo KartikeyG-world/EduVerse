@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const yts = require('yt-search');
 const axios = require('axios');
-const { protect } = require('../middlewares/auth');
+const { protect, optionalAuth } = require('../middlewares/auth');
 
 // Simple in-memory cache — expires after 10 minutes
 const cache = new Map();
@@ -18,7 +18,7 @@ const setCache = (key, data) => cache.set(key, { data, ts: Date.now() });
 
 // @route  GET /api/discover?q=...
 // @desc   Search YouTube + AI-filter for best learning resources
-router.get('/', protect, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   const query = (req.query.q || '').trim();
   if (!query || query.length < 2) {
     return res.status(400).json({ message: 'Query too short.' });
