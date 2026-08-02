@@ -1,22 +1,34 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+// Force IPv4 resolution first — Railway containers do not support outbound IPv6, causing ENETUNREACH socket errors
+if (dns.setDefaultResultOrder) {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 const emailUser = (process.env.EMAIL_USER || '').trim().replace(/^["']|["']$/g, '');
 const emailPass = (process.env.EMAIL_PASS || '').trim().replace(/^["']|["']$/g, '');
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Direct SSL/TLS on port 465 (bypasses port 587 STARTTLS blocking/timeouts)
   auth: {
     user: emailUser,
     pass: emailPass,
   },
+  family: 4, // Force IPv4 socket connection (eliminates ENETUNREACH on IPv6 addresses)
   pool: true,
   maxConnections: 5,
-  maxMessages: 100
+  maxMessages: 100,
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000,
 });
 
 // Verify SMTP connection on startup — surfaces credential/config errors immediately
 transporter.verify()
-  .then(() => console.log(`[EMAIL] SMTP transporter verified successfully for: ${emailUser}`))
+  .then(() => console.log(`[EMAIL] SMTP transporter verified successfully over IPv4 (port 465 SSL) for: ${emailUser}`))
   .catch((err) => console.error("[EMAIL] SMTP transporter verification FAILED:", err.message));
 
 const getBaseTemplate = (content) => `
