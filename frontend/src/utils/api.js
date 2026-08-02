@@ -1,9 +1,25 @@
 import axios from 'axios';
 
+// Normalize base URL: ensure it always ends with /api
+// Handles all user configurations:
+//   https://app.up.railway.app       → https://app.up.railway.app/api
+//   https://app.up.railway.app/      → https://app.up.railway.app/api
+//   https://app.up.railway.app/api   → https://app.up.railway.app/api
+//   https://app.up.railway.app/api/  → https://app.up.railway.app/api
+const normalizeBaseURL = (url) => {
+  if (!url) return 'http://localhost:5000/api';
+  let normalized = url.replace(/\/+$/, ''); // strip trailing slashes
+  if (!normalized.endsWith('/api')) {
+    normalized += '/api';
+  }
+  return normalized;
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: normalizeBaseURL(import.meta.env.VITE_API_BASE_URL),
   withCredentials: true,
 });
+
 
 // Add a request interceptor
 api.interceptors.request.use(

@@ -10,8 +10,23 @@ const app = express();
 // Middleware
 // app.use(helmet()); // Temporarily disabled to resolve connectivity issues
 app.use(express.json());
+
+// CORS — allow Vercel frontend + localhost for development
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000"
+].filter(Boolean);
+
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, health checks)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true
 }));
 
@@ -22,6 +37,10 @@ const authLimiter = rateLimit({
   message: { error: "Too many requests, please try again later" }
 });
 */
+
+// Health check endpoints (Railway probes + uptime monitoring)
+app.get("/health", (_req, res) => res.status(200).json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/api/health", (_req, res) => res.status(200).json({ status: "ok", timestamp: new Date().toISOString() }));
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
@@ -46,6 +65,6 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("Connected to MongoDB Atlas");
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => console.error("MongoDB connection error:", err));
