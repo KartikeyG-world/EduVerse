@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, optionalAuth } = require("../middlewares/auth");
 const Activity = require("../models/Activity");
 const Plan = require("../models/Plan");
+const TopicMastery = require("../models/TopicMastery");
 const axios = require("axios");
 const { updateStreak } = require("../utils/streak");
 
@@ -32,6 +33,7 @@ Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep
 
     return response.data?.choices?.[0]?.message?.content || "Keep up the excellent momentum! 🔥";
   } catch (error) {
+    console.error("AI Insight Generation Failed:", error.message || error);
     return "Consistent focus brings massive results! 🧠✨";
   }
 };
@@ -51,6 +53,13 @@ router.get("/", optionalAuth, async (req, res) => {
           sessions: 0, chats: 0, studyTime: 0
         })),
         topics: { strong: "System Metrics", weak: "Requires Login" },
+        mastery: {
+          totalTopics: 0,
+          masteredCount: 0,
+          weakCount: 0,
+          revisionDueCount: 0,
+          averageMastery: 0
+        },
         insight: "Preview Mode: Register natively to unlock structural analytical tracking arrays and start ranking up! 🧠✨"
       });
     }
@@ -105,15 +114,35 @@ router.get("/", optionalAuth, async (req, res) => {
         });
     }
 
-    // 2. Weak vs Strong Topics (Determined purely by Plans)
-    const userPlans = await Plan.find({ userId: user._id }).lean();
-    let strongTopic = "Web Development";
-    let weakTopic = "Data Structures";
+    // 2. Weak vs Strong Topics (Determined by TopicMastery)
+    const masteryTopics = await TopicMastery.find({ userId: user._id }).lean();
     
-    if (userPlans.length >= 2) {
-        strongTopic = userPlans[0].subject || strongTopic;
-        weakTopic = userPlans[userPlans.length-1].subject || weakTopic;
+    let strongTopic = "Keep studying!";
+    let weakTopic = "Add more topics!";
+    
+    if (masteryTopics.length > 0) {
+      const sortedByMastery = [...masteryTopics].sort((a, b) => b.masteryScore - a.masteryScore);
+      strongTopic = sortedByMastery[0].topicName;
+      
+      const weakOnes = masteryTopics.filter(t => t.isWeakArea).sort((a, b) => a.masteryScore - b.masteryScore);
+      if (weakOnes.length > 0) {
+        weakTopic = weakOnes[0].topicName;
+      } else if (masteryTopics.length > 1) {
+        weakTopic = sortedByMastery[sortedByMastery.length - 1].topicName;
+      }
     }
+
+    // Additional mastery stats for the new UI component
+    const now = new Date();
+    const masteryStats = {
+      totalTopics: masteryTopics.length,
+      masteredCount: masteryTopics.filter(t => t.masteryScore >= 80).length,
+      weakCount: masteryTopics.filter(t => t.isWeakArea).length,
+      revisionDueCount: masteryTopics.filter(t => t.nextRevisionDue <= now).length,
+      averageMastery: masteryTopics.length > 0 
+        ? Math.round(masteryTopics.reduce((acc, t) => acc + t.masteryScore, 0) / masteryTopics.length)
+        : 0
+    };
 
     // 3. Dynamic Insight Text
     const insightText = await generateInsight(user.name, {
@@ -134,6 +163,7 @@ router.get("/", optionalAuth, async (req, res) => {
         strong: strongTopic,
         weak: weakTopic
       },
+      mastery: masteryStats,
       insight: insightText
     });
 

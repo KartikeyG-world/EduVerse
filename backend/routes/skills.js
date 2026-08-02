@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Skill = require('../models/Skill');
+const User = require('../models/User');
 const { protect, optionalAuth } = require('../middlewares/auth');
 const { createNotification } = require('../utils/notification');
 const QuizAttempt = require('../models/QuizAttempt');
@@ -59,7 +60,7 @@ router.post('/', protect, async (req, res) => {
     res.status(201).json(skill);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -138,7 +139,7 @@ router.get('/', optionalAuth, async (req, res) => {
     res.json(skills);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -155,7 +156,7 @@ router.get('/:id', protect, async (req, res) => {
     res.json(skill);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -201,9 +202,17 @@ router.put('/:id/progress', protect, async (req, res) => {
     // Trigger XP reward and notification if newly completed
     if (!wasCompleted && skill.completed) {
       const xpReward = 500;
-      req.user.xp = (req.user.xp || 0) + xpReward;
-      req.user.level = Math.floor(req.user.xp / 1000) + 1;
-      await req.user.save();
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user.id,
+        { $inc: { xp: xpReward } },
+        { new: true }
+      );
+      if (updatedUser) {
+        const newLevel = Math.floor(updatedUser.xp / 1000) + 1;
+        if (updatedUser.level !== newLevel) {
+          await User.findByIdAndUpdate(req.user.id, { $set: { level: newLevel } });
+        }
+      }
 
       await createNotification(
         req.user.id,
@@ -215,7 +224,7 @@ router.put('/:id/progress', protect, async (req, res) => {
     res.json(skill);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -247,10 +256,19 @@ router.post('/:id/quiz', protect, async (req, res) => {
 
     await attempt.save();
 
+    // Hook into Mastery Engine
+    // For now, use skill title as topic and category as category
+    const { updateTopicMastery } = require('../utils/mastery');
+    await updateTopicMastery(req.user.id, skill.title, skill.category, {
+      isCorrect: percentage >= 70, // Assume 70% is "correct" for the topic overall
+      confidence: percentage,
+      difficulty: skill.difficulty || 'medium'
+    });
+
     res.status(201).json(attempt);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -271,7 +289,7 @@ router.get('/:id/quiz', protect, async (req, res) => {
     res.json(attempts);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 
@@ -288,7 +306,7 @@ router.delete('/:id', protect, async (req, res) => {
     res.json({ message: 'Skill removed' });
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
 

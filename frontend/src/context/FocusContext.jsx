@@ -108,17 +108,13 @@ export const FocusProvider = ({ children }) => {
       handleSessionComplete(elapsed);
     }
   }, [isAuthenticated, handleSessionComplete]);
-
   const resetTimer = useCallback(() => {
     setIsActive(false);
-    setTimeout(() => {
-      if (timerTypeRef.current === 'stopwatch') {
-        setStopwatchTime(0);
-      } else {
-        setTimeLeft((dur) => dur); // trigger re‑read from duration
-        setTimeLeft(duration * 60);
-      }
-    }, 10);
+    if (timerTypeRef.current === 'stopwatch') {
+      setStopwatchTime(0);
+    } else {
+      setTimeLeft(duration * 60);
+    }
   }, [duration]);
 
   const adjustDuration = useCallback((amount) => {

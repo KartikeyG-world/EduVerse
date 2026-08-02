@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Clock, FileText, Code,
   BarChart3, MessageSquare, CreditCard, GraduationCap,
-  LogOut, User, Flame, X
+  LogOut, User, Flame, X, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../../context/AuthContext';
@@ -13,6 +13,8 @@ const NAV_LINKS = [
   { name: 'Study Planner',  path: '/planner', icon: <BookOpen size={18} /> },
   { name: 'Focus Mode',     path: '/focus',   icon: <Clock size={18} /> },
   { name: 'Smart Notes',    path: '/notes',   icon: <FileText size={18} /> },
+  // Phase 2: SRS
+  { name: 'Flashcards',     path: '/flashcards/study', icon: <Layers size={18} /> },
   { name: 'Skills Hub',     path: '/skills',  icon: <Code size={18} /> },
   { name: 'Tutor Network',  path: '/tutor',   icon: <GraduationCap size={18} /> },
   { name: 'Analytics',      path: '/analytics', icon: <BarChart3 size={18} /> },
@@ -86,7 +88,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 `flex items-center gap-3 px-4 py-3 lg:py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden group text-sm font-medium ${
                   isActive
                     ? 'text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+                    : 'text-gray-400 active:text-white active:bg-white/[0.04] md:hover:text-white md:hover:bg-white/[0.04]'
                 }`
               }
             >
@@ -102,10 +104,10 @@ const Sidebar = ({ isOpen, onClose }) => {
                   )}
 
                   {/* Hover shimmer */}
-                  <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-white/[0.03] to-transparent rounded-xl pointer-events-none" />
+                  <span className="absolute inset-0 opacity-0 active:opacity-100 md:group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-white/[0.03] to-transparent rounded-xl pointer-events-none" />
 
                   {/* Icon */}
-                  <span className={`relative z-10 transition-transform duration-200 group-hover:-translate-y-0.5 ${isActive ? 'text-primary' : ''}`}>
+                  <span className={`relative z-10 transition-transform duration-200 group-active:-translate-y-0.5 md:group-hover:-translate-y-0.5 ${isActive ? 'text-primary' : ''}`}>
                     {link.icon}
                   </span>
 

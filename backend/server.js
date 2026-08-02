@@ -8,18 +8,23 @@ const rateLimit = require("express-rate-limit");
 const app = express();
 
 // Middleware
-app.use(helmet());
+// app.use(helmet()); // Temporarily disabled to resolve connectivity issues
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
+/*
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: "Too many requests, please try again later" }
 });
+*/
 
 // Routes
-app.use("/api/auth", authLimiter, require("./routes/auth"));
+app.use("/api/auth", require("./routes/auth"));
 app.use("/api/users", require("./routes/users"));
 app.use("/api/notes", require("./routes/notes"));
 app.use("/api/expenses", require("./routes/expenses"));
@@ -31,6 +36,9 @@ app.use("/api/skills", require("./routes/skills"));
 app.use("/api/discover", require("./routes/discover"));
 app.use("/api/skillhub", require("./routes/skillHub"));
 app.use("/api/focus", require("./routes/focus"));
+app.use("/api/mastery", require("./routes/mastery"));
+app.use("/api/flashcards", require("./routes/flashcards")); // Phase 2: SRS
+app.use("/api/chat", require("./routes/chat"));
 
 const PORT = process.env.PORT || 5000;
 

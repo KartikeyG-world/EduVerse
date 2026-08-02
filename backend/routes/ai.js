@@ -4,6 +4,8 @@ const Plan = require("../models/Plan");
 const { protect, optionalAuth } = require("../middlewares/auth");
 const axios = require("axios");
 const { fetchResourcesForTopic } = require("../utils/resources");
+const Activity = require("../models/Activity");
+const ChatMessage = require("../models/ChatMessage");
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -114,7 +116,6 @@ Respond ONLY with valid JSON in this exact structure:
     const savedPlan = await newPlan.save();
     
     // Log AI usage
-    const Activity = require("../models/Activity");
     await Activity.create({ userId: req.user._id, type: 'planner', duration: 0 });
 
     res.json(savedPlan);
@@ -132,6 +133,24 @@ router.get("/planner", optionalAuth, async (req, res) => {
     res.json(plans);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch study plans" });
+  }
+});
+
+// Delete user's saved study plan
+router.delete("/planner/:id", protect, async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ error: "Plan not found" });
+
+    if (plan.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    await plan.deleteOne();
+    res.status(200).json({ message: "Plan deleted successfully" });
+  } catch (err) {
+    console.error("Failed to delete plan:", err);
+    res.status(500).json({ error: "Failed to delete plan" });
   }
 });
 
@@ -154,7 +173,6 @@ router.post("/summarize", protect, async (req, res) => {
     const summaryText = await openRouterCall(messages);
     
     // Log Activity
-    const Activity = require("../models/Activity");
     await Activity.create({ userId: req.user._id, type: 'notes', duration: 0 });
 
     res.json({ summary: summaryText });
@@ -167,15 +185,16 @@ router.post("/summarize", protect, async (req, res) => {
 // AI Chatbot
 router.post("/chat", protect, async (req, res) => {
   try {
-    const { message, history } = req.body;
-    const ChatMessage = require("../models/ChatMessage");
+    const { message, history, isSystemMessage } = req.body;
 
     // Save user message
-    await ChatMessage.create({
-      user: req.user.id,
-      role: "user",
-      content: message
-    });
+    if (!isSystemMessage) {
+      await ChatMessage.create({
+        user: req.user.id,
+        role: "user",
+        content: message
+      });
+    }
 
     const messages = [
       {
@@ -198,15 +217,16 @@ router.post("/chat", protect, async (req, res) => {
     const replyText = await openRouterCall(messages);
     
     // Save assistant reply
-    await ChatMessage.create({
-      user: req.user.id,
-      role: "assistant",
-      content: replyText
-    });
+    if (!isSystemMessage) {
+      await ChatMessage.create({
+        user: req.user.id,
+        role: "assistant",
+        content: replyText
+      });
 
-    // Log Activity
-    const Activity = require("../models/Activity");
-    await Activity.create({ userId: req.user._id, type: 'chat', duration: 0 });
+      // Log Activity
+      await Activity.create({ userId: req.user._id, type: 'chat', duration: 0 });
+    }
 
     res.json({ reply: replyText });
   } catch (err) {
@@ -221,7 +241,6 @@ router.get("/chat/history", optionalAuth, async (req, res) => {
     if (!req.user) {
       return res.json({ success: true, history: [] });
     }
-    const ChatMessage = require("../models/ChatMessage");
     const messages = await ChatMessage.find({ user: req.user.id })
       .sort({ timestamp: 1 })
       .limit(100);

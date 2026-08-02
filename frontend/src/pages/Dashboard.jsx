@@ -9,11 +9,14 @@ import {
 } from 'recharts';
 import { 
   Flame, Clock, Target, Sparkles, TrendingUp, TrendingDown, Activity, 
-  BrainCircuit, ArrowRight, RefreshCw, Zap
+  BrainCircuit, ArrowRight, RefreshCw, Zap, Layers, BookOpen
 } from 'lucide-react';
+// Phase 2: Flashcard pending count
+import { getPendingCount } from '../api/flashcards';
 import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import PremiumButton from '../components/ui/PremiumButton';
 import ParallaxLayer from '../components/ui/ParallaxLayer';
+import MasteryOverview from '../components/dashboard/MasteryOverview';
 
 // Animated Counter Component replacing previous custom hook to obey rules
 const AnimatedCounter = ({ end, duration = 2000 }) => {
@@ -47,14 +50,18 @@ const TypewriterText = ({ text }) => {
   const [displayed, setDisplayed] = useState('');
   
   useEffect(() => {
-    let i = 0;
-    setDisplayed('');
-    if (!text) return;
+    if (!text) {
+      setDisplayed('');
+      return;
+    }
     
+    let i = 0;
     const interval = setInterval(() => {
-      setDisplayed((prev) => prev + text.charAt(i));
       i++;
-      if (i >= text.length) clearInterval(interval);
+      setDisplayed(text.substring(0, i));
+      if (i >= text.length) {
+        clearInterval(interval);
+      }
     }, 30);
     
     return () => clearInterval(interval);
@@ -71,6 +78,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [chartReady, setChartReady] = useState(false);
+  const [pendingCards, setPendingCards] = useState(null); // Phase 2: SRS
   const { triggerFeedback } = useContext(CompanionContext);
 
   useEffect(() => {
@@ -97,6 +105,13 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+    // Phase 2: Fetch flashcard review count — isolated so it never breaks the dashboard
+    try {
+      const fcRes = await getPendingCount();
+      setPendingCards(fcRes.data.count ?? 0);
+    } catch (_) {
+      setPendingCards(0);
     }
   };
 
@@ -179,8 +194,8 @@ const Dashboard = () => {
         <ScrollRevealGroup stagger={0.1} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         
         {/* Streak Card */}
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-orange-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all"></div>
+        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group active:border-orange-500/30 md:hover:border-orange-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-orange-500/10 rounded-full blur-2xl group-active:bg-orange-500/20 md:group-hover:bg-orange-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Active Streak</h3>
@@ -204,8 +219,8 @@ const Dashboard = () => {
         </div>
 
         {/* Level Card */}
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-primary/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-all"></div>
+        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group active:border-primary/30 md:hover:border-primary/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary/10 rounded-full blur-2xl group-active:bg-primary/20 md:group-hover:bg-primary/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Rank Progress</h3>
@@ -232,8 +247,8 @@ const Dashboard = () => {
         </div>
 
         {/* Focus Hours Card */}
-        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group hover:border-blue-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6 md:col-span-2 lg:col-span-1">
-          <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
+        <div className="glass-next-gen dynamic-lighting flex flex-col justify-between group active:border-blue-500/30 md:hover:border-blue-500/30 transition-colors relative overflow-hidden rounded-2xl p-4 md:p-6 md:col-span-2 lg:col-span-1">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-active:bg-blue-500/20 md:group-hover:bg-blue-500/20 transition-all"></div>
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Deep Work Time</h3>
@@ -251,6 +266,63 @@ const Dashboard = () => {
         </div>
       </ScrollRevealGroup>
       </ParallaxLayer>
+
+      {/* Learning Intelligence Layer */}
+      <ScrollReveal delay={0.2}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Sparkles size={18} className="text-primary" /> Mastery Engine
+            </h3>
+            <span className="text-xs text-gray-500 bg-surface px-2 py-1 rounded-lg border border-white/5">
+              Study DNA v1.0
+            </span>
+          </div>
+          <MasteryOverview stats={data.mastery} />
+        </div>
+      </ScrollReveal>
+
+      {/* Phase 2: Daily Review Widget (SRS) — additive section */}
+      {pendingCards !== null && (
+        <ScrollReveal delay={0.25}>
+          <motion.div
+            className="glass-next-gen dynamic-lighting rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-primary/10 hover:border-primary/25 transition-colors"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-xl border border-primary/20 flex-shrink-0">
+                <Layers size={22} className="text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <BookOpen size={14} className="text-primary" /> Daily Review
+                  <span className="text-[10px] font-medium text-gray-500 bg-surface px-2 py-0.5 rounded-md border border-white/5 ml-1">SRS</span>
+                </h3>
+                {pendingCards === 0 ? (
+                  <p className="text-xs text-emerald-400 mt-0.5 font-medium">
+                    ✓ All caught up — no cards due today!
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    <span className="text-primary font-black text-base">{pendingCards}</span>
+                    {' '}flashcard{pendingCards !== 1 ? 's' : ''} pending review today
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              id="dashboard-start-review-btn"
+              onClick={() => navigate('/flashcards/study')}
+              disabled={pendingCards === 0}
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-primary/20 hover:bg-primary/30 disabled:opacity-40 disabled:cursor-not-allowed border border-primary/30 text-primary rounded-xl text-sm font-bold transition-all"
+            >
+              {pendingCards === 0 ? 'No Cards Due' : 'Start Review'}
+              {pendingCards > 0 && <ArrowRight size={14} />}
+            </button>
+          </motion.div>
+        </ScrollReveal>
+      )}
 
       {/* Main Content Area */}
       <ParallaxLayer depth={0.06}>
@@ -270,9 +342,10 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <div className="w-full h-[200px] sm:h-[250px] md:h-[300px] lg:h-[320px] mt-2 sm:mt-4 ml-0 md:-ml-4">
-            {chartReady && (
-              <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full overflow-x-auto custom-scrollbar pb-2">
+            <div className="h-[200px] sm:h-[250px] md:h-[300px] lg:h-[320px] min-w-[500px] md:min-w-0 w-full mt-2 sm:mt-4 ml-0 md:-ml-4">
+              {chartReady && (
+                <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dailyActivity} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorStudy" x1="0" y1="0" x2="0" y2="1">
@@ -300,6 +373,7 @@ const Dashboard = () => {
                 </AreaChart>
               </ResponsiveContainer>
             )}
+            </div>
           </div>
         </ScrollReveal>
 

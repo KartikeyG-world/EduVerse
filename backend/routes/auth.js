@@ -98,7 +98,21 @@ router.post("/verify-otp", async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
     if (user.isVerified) {
-      return res.status(400).json({ success: false, message: "User is already verified" });
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
+      return res.json({
+        success: true,
+        token,
+        user: { 
+          id: user._id, 
+          name: user.name, 
+          email: user.email, 
+          avatar: user.avatar, 
+          xp: user.xp, 
+          level: user.level,
+          streak: user.streak,
+          focusHours: user.focusHours
+        }
+      });
     }
 
     if (user.otpAttempts >= 5) {

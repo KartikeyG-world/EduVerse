@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
-import { motion } from 'framer-motion';
-import { Sparkles, Calendar, Target, Book, ChevronRight, History, Clock, RefreshCcw, Play, ExternalLink, FileText } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Calendar, Target, Book, ChevronRight, History, Clock, RefreshCcw, Play, ExternalLink, FileText, Trash2 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import PremiumButton from '../components/ui/PremiumButton';
@@ -17,6 +17,7 @@ const StudyPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState(null);
   const [savedPlans, setSavedPlans] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
   const { requireAuth, isAuthenticated } = useContext(AuthContext);
 
   // Source Preview Modal State
@@ -64,6 +65,21 @@ const StudyPlanner = () => {
       if (err.response?.status !== 401) {
         console.error('Failed to load past plans');
       }
+    }
+  };
+
+  const handleDeletePlan = async (e, planId) => {
+    e.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this study plan?")) return;
+    
+    setDeletingId(planId);
+    try {
+      await api.delete(`/ai/planner/${planId}`);
+      setSavedPlans(prev => prev.filter(p => p._id !== planId));
+    } catch (err) {
+      console.error("Failed to delete plan:", err);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -218,19 +234,34 @@ const StudyPlanner = () => {
                 <p className="text-sm text-gray-500">No saved plans yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {savedPlans.map(p => (
-                    <button 
-                      key={p._id}
-                      onClick={() => setPlan(p.roadmap)}
-                      className="w-full text-left p-3 rounded-lg border border-white/5 hover:border-primary/30 hover:bg-white/5 transition-all flex justify-between items-center group min-h-[44px]"
-                    >
-                      <div>
-                        <p className="font-medium text-sm text-white truncate max-w-[120px]">{p.subject}</p>
-                        <p className="text-xs text-secondary">{p.durationDays} Days</p>
-                      </div>
-                      <ChevronRight size={16} className="text-gray-500 group-hover:text-primary transition-colors flex-shrink-0" />
-                    </button>
-                  ))}
+                  <AnimatePresence>
+                    {savedPlans.map(p => (
+                      <motion.div
+                        key={p._id}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative group"
+                      >
+                        <button 
+                          onClick={() => setPlan(p.roadmap)}
+                          className="w-full text-left p-3 rounded-lg border border-white/5 hover:border-primary/30 hover:bg-white/5 transition-all flex justify-between items-center min-h-[44px]"
+                        >
+                          <div>
+                            <p className="font-medium text-sm text-white truncate max-w-[120px]">{p.subject}</p>
+                            <p className="text-xs text-secondary">{p.durationDays} Days</p>
+                          </div>
+                          <ChevronRight size={16} className="text-gray-500 group-hover:opacity-0 transition-all flex-shrink-0" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeletePlan(e, p._id)}
+                          disabled={deletingId === p._id}
+                          className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg p-2 disabled:opacity-50"
+                        >
+                          {deletingId === p._id ? <RefreshCcw size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               )}
             </ScrollReveal>

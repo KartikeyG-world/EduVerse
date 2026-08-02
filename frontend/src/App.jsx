@@ -24,6 +24,7 @@ import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
 import Profile from './pages/Profile';
 import Tutor from './pages/Tutor';
+import FlashcardStudy from './pages/FlashcardStudy'; // Phase 2: SRS
 
 import { CompanionProvider } from './context/CompanionContext';
 import { FocusProvider } from './context/FocusContext';
@@ -63,7 +64,10 @@ function App() {
                     <Route path="chat" element={<Chatbot />} />
                     <Route path="tutor" element={<Tutor />} />
                     <Route path="profile" element={<Profile />} />
+                    {/* Phase 2: SRS study route */}
+                    <Route path="flashcards/study" element={<FlashcardStudy />} />
                   </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </InteractionProvider>
             </FocusProvider>

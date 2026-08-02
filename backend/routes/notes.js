@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Note = require("../models/Note");
-const { protect } = require("../middlewares/auth");
+const { protect, optionalAuth } = require("../middlewares/auth");
 
 // ROUTE 1 — GET /api/notes
 // Fetch ALL notes belonging to req.user.id
@@ -62,6 +62,17 @@ router.put("/:id", protect, async (req, res) => {
     );
 
     res.json({ success: true, note: updatedNote });
+
+    // Hook into Mastery Engine
+    if (updatedNote.title && updatedNote.title !== "Untitled Note") {
+      const { updateTopicMastery } = require('../utils/mastery');
+      // Use tags[0] as category if available, else "Notes"
+      const category = (updatedNote.tags && updatedNote.tags.length > 0) ? updatedNote.tags[0] : "Notes";
+      await updateTopicMastery(req.user.id, updatedNote.title, category, {
+        isCorrect: true, // Saving notes is a positive study action
+        notes: updatedNote.summary || "Studied notes"
+      });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

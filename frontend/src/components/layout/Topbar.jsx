@@ -51,7 +51,7 @@ const Topbar = ({ onMenuClick }) => {
   };
 
   return (
-    <header className="h-16 lg:h-20 glass border-b border-white/10 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-[200] sticky top-0 backdrop-blur-3xl shadow-lg">
+    <header className="h-16 lg:h-20 glass border-b border-white/10 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-[200] sticky top-0 backdrop-blur-md lg:backdrop-blur-3xl shadow-lg">
       <div className="flex items-center flex-1 max-w-xl gap-3">
         {/* Mobile Hamburger Menu */}
         <button 

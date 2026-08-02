@@ -8,6 +8,13 @@ import { loadSlim } from '@tsparticles/slim';
  
 const ParticleBackground = memo(({ mode = 'ambient' }) => {
   const [init, setInit] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // this should be run only once per application lifetime
   useEffect(() => {
@@ -23,9 +30,9 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
   const ambientOptions = useMemo(() => ({
     fullScreen: false,
     background: { color: { value: 'transparent' } },
-    fpsLimit: 40,
+    fpsLimit: isMobile ? 30 : 40,
     particles: {
-      number: { value: 38, density: { enable: true, area: 900 } },
+      number: { value: isMobile ? 12 : 38, density: { enable: true, area: 900 } },
       color: { value: ['#6366f1', '#06b6d4', '#8b5cf6'] },
       shape: { type: 'circle' },
       opacity: {
@@ -46,22 +53,22 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
         outModes: { default: 'out' },
       },
       links: {
-        enable: true,
+        enable: !isMobile,
         distance: 130,
         color: '#6366f1',
         opacity: 0.07,
         width: 1,
       },
     },
-    detectRetina: true,
-  }), []);
+    detectRetina: !isMobile,
+  }), [isMobile]);
 
   const focusOptions = useMemo(() => ({
     fullScreen: false,
     background: { color: { value: 'transparent' } },
-    fpsLimit: 50,
+    fpsLimit: isMobile ? 40 : 50,
     particles: {
-      number: { value: 60, density: { enable: true, area: 800 } },
+      number: { value: isMobile ? 20 : 60, density: { enable: true, area: 800 } },
       color: { value: ['#06b6d4', '#6366f1', '#a78bfa'] },
       shape: { type: 'circle' },
       opacity: {
@@ -83,15 +90,15 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
         attract: { enable: true, rotateX: 600, rotateY: 1200 },
       },
       links: {
-        enable: true,
+        enable: !isMobile,
         distance: 150,
         color: '#06b6d4',
         opacity: 0.12,
         width: 1,
       },
     },
-    detectRetina: true,
-  }), []);
+    detectRetina: !isMobile,
+  }), [isMobile]);
 
   if (!init) return null;
 

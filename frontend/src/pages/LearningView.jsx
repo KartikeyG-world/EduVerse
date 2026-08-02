@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Clock, Trophy, Zap, AlertCircle,
@@ -247,19 +248,22 @@ const LearningView = () => {
     setQuizLoading(true);
     try {
       const prompt = `Generate exactly 5 multiple-choice quiz questions about the topic: "${skill.title}" (category: ${skill.category}).
+IMPORTANT: The primary language MUST be English, but provide a Hindi translation for each field.
 
 Return ONLY a valid JSON array with this exact structure, no extra text:
 [
   {
-    "question": "Question text here?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "question": "Question text in English?",
+    "questionHindi": "प्रश्न पाठ हिंदी में?",
+    "options": ["Option A English", "Option B English", "Option C English", "Option D English"],
+    "optionsHindi": ["विकल्प ए हिंदी", "विकल्प बी हिंदी", "विकल्प सी हिंदी", "विकल्प डी हिंदी"],
     "correctIndex": 0
   }
 ]
 
 Make each question test real conceptual understanding. correctIndex is 0-based.`;
 
-      const res = await api.post('/ai/chat', { message: prompt, history: [] });
+      const res = await api.post('/ai/chat', { message: prompt, history: [], isSystemMessage: true });
       const raw = res.data.reply;
 
       // Extract JSON robustly

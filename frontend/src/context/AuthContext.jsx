@@ -19,9 +19,10 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const verifyUser = async () => {
-      if (token) {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
         try {
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          api.defaults.headers.common['Authorization'] = `Bearer ${currentToken}`;
           const res = await api.get('/auth/me');
           setUser(res.data);
           setIsAuthenticated(true);
@@ -44,7 +45,7 @@ const AuthProvider = ({ children }) => {
     };
 
     verifyUser();
-  }, [token]);
+  }, []);
 
   // 15-second soft prompt for Guest Experience
   useEffect(() => {

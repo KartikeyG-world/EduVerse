@@ -247,3 +247,48 @@
   outline: 2px solid rgba(99, 102, 241, 0.7);
   outline-offset: 2px;
 }
+
+/* ─── Flashcard SRS — Scoped 3D flip styles (Phase 2) ───────────────────── */
+/* All classes prefixed with .flashcard- to prevent style leakage            */
+.flashcard-scene {
+  display: block;
+}
+
+.flashcard-card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.flashcard-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flashcard-back {
+  transform: rotateY(180deg);
+}
+
+/* Hover shimmer on rating buttons */
+.flashcard-rating-btn {
+  position: relative;
+  overflow: hidden;
+}
+.flashcard-rating-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* Study page layout wrapper — keeps stacking context clean */
+.flashcard-study-page {
+  min-height: calc(100vh - 140px);
+  padding-bottom: 3rem;
+}
+

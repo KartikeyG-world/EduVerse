@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, Award, Zap } from 'lucide-react';
+import { BarChart3, TrendingUp, Award, Zap, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
@@ -10,18 +10,25 @@ import ParallaxLayer from '../components/ui/ParallaxLayer';
 const Analytics = () => {
   const { user, isAuthenticated } = useContext(AuthContext);
   const [stats, setStats] = useState({ xp: 0, level: 1, streak: 0, focusHours: 0 });
+  const [masteryStats, setMasteryStats] = useState({ weak: [], mastered: [] });
   const [activityData, setActivityData] = useState([]);
 
   useEffect(() => {
     if (!isAuthenticated) return; // guests see zero-state, no API call
     const fetchStats = async () => {
       try {
-        const [statsRes, historyRes] = await Promise.all([
+        const [statsRes, historyRes, weakRes, masteredRes] = await Promise.all([
           api.get('/users/me'),
-          api.get('/focus/history')
+          api.get('/focus/history'),
+          api.get('/mastery/weak'),
+          api.get('/mastery/all')
         ]);
         
         setStats(statsRes.data);
+        setMasteryStats({
+          weak: weakRes.data,
+          mastered: masteredRes.data.filter(t => t.masteryScore >= 80)
+        });
         
         // Process real history data for the chart
         if (historyRes.data.success) {
@@ -131,6 +138,44 @@ const Analytics = () => {
         </div>
         </ScrollReveal>
       </ParallaxLayer>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ScrollReveal delay={0.5} className="glass-next-gen p-6 rounded-2xl">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <TrendingUp size={18} className="text-emerald-400" /> Mastered Topics
+          </h3>
+          <div className="space-y-4">
+            {masteryStats.mastered.length > 0 ? masteryStats.mastered.map((t, i) => (
+              <div key={i} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                <span className="text-sm text-gray-200">{t.topicName}</span>
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-lg">
+                  {t.masteryScore}%
+                </span>
+              </div>
+            )) : (
+              <p className="text-gray-500 text-sm text-center py-4">No topics mastered yet. Keep going!</p>
+            )}
+          </div>
+        </ScrollReveal>
+
+        <ScrollReveal delay={0.6} className="glass-next-gen p-6 rounded-2xl">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <AlertCircle size={18} className="text-red-400" /> Weak Areas
+          </h3>
+          <div className="space-y-4">
+            {masteryStats.weak.length > 0 ? masteryStats.weak.map((t, i) => (
+              <div key={i} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
+                <span className="text-sm text-gray-200">{t.topicName}</span>
+                <span className="text-xs font-bold text-red-400 bg-red-400/10 px-2 py-1 rounded-lg">
+                  {t.masteryScore}%
+                </span>
+              </div>
+            )) : (
+              <p className="text-gray-500 text-sm text-center py-4">Great job! No weak areas identified.</p>
+            )}
+          </div>
+        </ScrollReveal>
+      </div>
 
     </div>
   );

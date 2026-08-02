@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Wand2, Plus, Trash2, Download, Bold, Italic, Underline as UnderlineIcon,
   Heading1, Heading2, List, ListOrdered, Quote, Code, Pin, Search, CheckCircle, 
-  Clock, AlertCircle, FileText, ChevronRight
+  Clock, AlertCircle, FileText, ChevronRight, BrainCircuit, Layers, X, ArrowRight
 } from 'lucide-react';
+import { generateFlashcards } from '../api/flashcards';
 import { AuthContext } from '../context/AuthContext';
 import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import PremiumButton from '../components/ui/PremiumButton';
@@ -34,6 +35,9 @@ const SmartNotes = () => {
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  // Phase 2: Flashcard generation state (additive)
+  const [fcLoading, setFcLoading] = useState(false);
+  const [fcResult, setFcResult] = useState(null);
 
   const activeNoteIdRef = useRef(null);
   const titleRef = useRef('');
@@ -212,7 +216,33 @@ const SmartNotes = () => {
     });
   };
 
+  // Phase 2 — Generate Flashcards from the active note content
+  const handleGenerateFlashcards = async () => {
+    requireAuth(async () => {
+      if (!editor || fcLoading) return;
+      const text = editor.getText();
+      if (!text.trim() || text.trim().length < 20) {
+        alert('Please write some content in your note before generating flashcards.');
+        return;
+      }
+      setFcLoading(true);
+      setFcResult(null);
+      try {
+        const html = editor.getHTML();
+        const topicName = (title && title !== 'Untitled Note') ? title : 'General';
+        const res = await generateFlashcards(html, topicName, activeNoteIdRef.current);
+        setFcResult({ count: res.data.count, topicName });
+      } catch (err) {
+        console.error('Flashcard generation failed', err);
+        alert('Failed to generate flashcards. Please try again.');
+      } finally {
+        setFcLoading(false);
+      }
+    });
+  };
+
   const handleExportPDF = async () => {
+
     if (!activeNote || exportLoading) return;
     setExportLoading(true);
     
@@ -242,6 +272,7 @@ const SmartNotes = () => {
   );
 
   return (
+    <>
     <div className="h-[calc(100vh-120px)] flex gap-6 overflow-hidden">
       
       {/* LEFT PANE: Notes Sidebar */}
@@ -343,11 +374,11 @@ const SmartNotes = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10 overflow-x-auto whitespace-nowrap scrollbar-hide w-full md:max-w-none">
                   <Toolbar editor={editor} />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0 overflow-x-auto scrollbar-hide w-full md:w-auto pb-1 md:pb-0">
                   <button 
                     onClick={handleExportPDF}
                     disabled={exportLoading}
@@ -362,6 +393,17 @@ const SmartNotes = () => {
                   >
                     <Sparkles size={16} className={aiLoading ? 'animate-spin' : ''} />
                     {aiLoading ? 'Summarizing...' : 'Summarize AI'}
+                  </button>
+                  {/* Phase 2 — Generate Flashcards (additive) */}
+                  <button 
+                    id="notes-generate-flashcards-btn"
+                    onClick={handleGenerateFlashcards}
+                    disabled={fcLoading || !activeNote}
+                    title="Generate AI Flashcards from this note"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-xl text-sm font-semibold text-primary transition-all disabled:opacity-50"
+                  >
+                    <BrainCircuit size={16} className={fcLoading ? 'animate-pulse' : ''} />
+                    {fcLoading ? 'Generating...' : 'Flashcards'}
                   </button>
                 </div>
               </div>
@@ -444,6 +486,60 @@ const SmartNotes = () => {
       </div>
 
     </div>
+
+    {/* Phase 2 — Flashcard generated success modal (additive) */}
+    <AnimatePresence>
+      {fcResult && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          onClick={() => setFcResult(null)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            className="relative bg-[#0d1117] border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Layers size={28} className="text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Flashcards Generated!</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              <span className="text-primary font-black text-3xl">{fcResult.count}</span>
+              <br />flashcards created for
+              <br /><span className="text-white font-semibold">"{fcResult.topicName}"</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFcResult(null)}
+                className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-semibold text-gray-300 transition-all"
+              >
+                Keep Writing
+              </button>
+              <a
+                href="/flashcards/study"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-xl text-sm font-bold text-primary transition-all"
+              >
+                Study Now <ArrowRight size={14} />
+              </a>
+            </div>
+            <button
+              onClick={() => setFcResult(null)}
+              className="absolute top-4 right-4 p-1 text-gray-600 hover:text-white transition-colors"
+              aria-label="Close modal"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 };
 

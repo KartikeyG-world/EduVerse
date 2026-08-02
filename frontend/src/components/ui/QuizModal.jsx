@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, XCircle, ArrowRight, SkipForward, Trophy, RefreshCcw } from 'lucide-react';
+import { X, CheckCircle2, XCircle, ArrowRight, SkipForward, Trophy, RefreshCcw, Languages } from 'lucide-react';
 
 // ─── Static backdrop overlay ─────────────────────────────────────────────────
 const Overlay = ({ children }) => (
@@ -72,6 +72,7 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult]       = useState(null); // { score, total }
   const [current, setCurrent]     = useState(0);
+  const [lang, setLang]           = useState('en'); // 'en' or 'hi'
 
   const total = questions.length;
   const answered = Object.keys(answers).length;
@@ -125,12 +126,21 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
             <h2 className="text-white font-black text-lg">Knowledge Check</h2>
             <p className="text-gray-500 text-xs mt-0.5 truncate max-w-[260px]">{skillTitle}</p>
           </div>
-          <button
-            onClick={onSkip}
-            className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all border border-white/5"
-          >
-            <SkipForward size={14} /> Skip Quiz
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLang(l => l === 'en' ? 'hi' : 'en')}
+              className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-white bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl transition-all border border-primary/20"
+              title="Change Language"
+            >
+              <Languages size={14} /> {lang === 'en' ? 'हिन्दी (HI)' : 'English (EN)'}
+            </button>
+            <button
+              onClick={onSkip}
+              className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl transition-all border border-white/5"
+            >
+              <SkipForward size={14} /> Skip Quiz
+            </button>
+          </div>
         </div>
 
         {/* Progress bar */}
@@ -159,7 +169,9 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              <p className="text-white font-semibold text-base leading-relaxed mb-5">{q.question}</p>
+              <p className="text-white font-semibold text-base leading-relaxed mb-5">
+                {lang === 'hi' && q.questionHindi ? q.questionHindi : q.question}
+              </p>
 
               <div className="space-y-2.5">
                 {q.options.map((opt, oIdx) => {
@@ -177,7 +189,7 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
                       <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg mr-3 text-xs font-black ${isSelected ? 'bg-primary text-white' : 'bg-white/10 text-gray-400'}`}>
                         {String.fromCharCode(65 + oIdx)}
                       </span>
-                      {opt}
+                      {lang === 'hi' && q.optionsHindi?.[oIdx] ? q.optionsHindi[oIdx] : opt}
                     </button>
                   );
                 })}
