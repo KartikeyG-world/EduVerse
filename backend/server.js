@@ -1,3 +1,17 @@
+// Polyfill global File for undici / OpenRouter SDK compatibility on Node.js < 20
+if (typeof globalThis.File === "undefined") {
+  try {
+    const { File } = require("node:buffer");
+    if (File) {
+      globalThis.File = File;
+    } else {
+      globalThis.File = class File extends Blob {};
+    }
+  } catch (e) {
+    globalThis.File = class File {};
+  }
+}
+
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
