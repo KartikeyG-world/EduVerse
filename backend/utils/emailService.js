@@ -1,35 +1,13 @@
-const nodemailer = require('nodemailer');
-const dns = require('dns');
+const emailSender = (process.env.BREVO_SENDER_EMAIL || '').trim();
+const apiKey = (process.env.BREVO_API_KEY || '').trim();
 
-// Force IPv4 resolution first — Railway containers do not support outbound IPv6, causing ENETUNREACH socket errors
-if (dns.setDefaultResultOrder) {
-  dns.setDefaultResultOrder('ipv4first');
+// Verify credentials presence
+if (!apiKey) {
+  console.warn('[EMAIL] WARNING: BREVO_API_KEY is not defined in environment variables.');
 }
-
-const emailUser = (process.env.EMAIL_USER || '').trim().replace(/^["']|["']$/g, '');
-const emailPass = (process.env.EMAIL_PASS || '').trim().replace(/^["']|["']$/g, '');
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Direct SSL/TLS on port 465 (bypasses port 587 STARTTLS blocking/timeouts)
-  auth: {
-    user: emailUser,
-    pass: emailPass,
-  },
-  family: 4, // Force IPv4 socket connection (eliminates ENETUNREACH on IPv6 addresses)
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 20000,
-});
-
-// Verify SMTP connection on startup — surfaces credential/config errors immediately
-transporter.verify()
-  .then(() => console.log(`[EMAIL] SMTP transporter verified successfully over IPv4 (port 465 SSL) for: ${emailUser}`))
-  .catch((err) => console.error("[EMAIL] SMTP transporter verification FAILED:", err.message));
+if (!emailSender) {
+  console.warn('[EMAIL] WARNING: BREVO_SENDER_EMAIL is not defined in environment variables.');
+}
 
 const getBaseTemplate = (content) => `
 <!DOCTYPE html>
@@ -65,6 +43,52 @@ const getBaseTemplate = (content) => `
 </html>
 `;
 
+const sendBrevoEmail = async (toEmail, toName, subject, htmlContent) => {
+  if (!apiKey || !emailSender) {
+    throw new Error('Email service configuration missing (BREVO_API_KEY or BREVO_SENDER_EMAIL)');
+  }
+
+  const payload = {
+    sender: {
+      name: 'EduVerse AI',
+      email: emailSender
+    },
+    to: [
+      {
+        email: toEmail,
+        name: toName || toEmail
+      }
+    ],
+    subject: subject,
+    htmlContent: htmlContent
+  };
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      console.error('[EMAIL] Brevo API Error response:', responseData);
+      throw new Error(`Brevo API returned status ${response.status}: ${responseData.message || JSON.stringify(responseData)}`);
+    }
+
+    console.log(`[EMAIL] Email sent successfully to ${toEmail}. MessageId: ${responseData.messageId}`);
+    return responseData;
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send email to ${toEmail}:`, error.message);
+    throw error;
+  }
+};
+
 exports.sendOTPEmail = async (email, name, otp) => {
   const content = `
     <h2>Hello ${name},</h2>
@@ -74,16 +98,7 @@ exports.sendOTPEmail = async (email, name, otp) => {
     <p>If you didn't request this, you can safely ignore this email.</p>
   `;
 
-  const mailOptions = {
-    from: `"EduVerse AI" <${emailUser}>`,
-    to: email,
-    subject: "Your EduVerse AI Verification Code",
-    html: getBaseTemplate(content),
-  };
-
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`[EMAIL] OTP sent to ${email}. MessageId: ${info.messageId}`);
-  return info;
+  return sendBrevoEmail(email, name, 'Your EduVerse AI Verification Code', getBaseTemplate(content));
 };
 
 exports.sendPasswordResetEmail = async (email, name, resetLink) => {
@@ -97,16 +112,7 @@ exports.sendPasswordResetEmail = async (email, name, resetLink) => {
     <p>If you didn't request a password reset, please secure your account immediately.</p>
   `;
 
-  const mailOptions = {
-    from: `"EduVerse AI" <${emailUser}>`,
-    to: email,
-    subject: "Reset Your EduVerse AI Password",
-    html: getBaseTemplate(content),
-  };
-
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`[EMAIL] Password reset sent to ${email}. MessageId: ${info.messageId}`);
-  return info;
+  return sendBrevoEmail(email, name, 'Reset Your EduVerse AI Password', getBaseTemplate(content));
 };
 
 exports.sendWelcomeEmail = async (email, name) => {
@@ -125,14 +131,5 @@ exports.sendWelcomeEmail = async (email, name) => {
     </div>
   `;
 
-  const mailOptions = {
-    from: `"EduVerse AI" <${emailUser}>`,
-    to: email,
-    subject: "Welcome to EduVerse AI",
-    html: getBaseTemplate(content),
-  };
-
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`[EMAIL] Welcome email sent to ${email}. MessageId: ${info.messageId}`);
-  return info;
+  return sendBrevoEmail(email, name, 'Welcome to EduVerse AI', getBaseTemplate(content));
 };
