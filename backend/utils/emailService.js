@@ -1,14 +1,3 @@
-const emailSender = (process.env.BREVO_SENDER_EMAIL || '').trim();
-const apiKey = (process.env.BREVO_API_KEY || '').trim();
-
-// Verify credentials presence
-if (!apiKey) {
-  console.warn('[EMAIL] WARNING: BREVO_API_KEY is not defined in environment variables.');
-}
-if (!emailSender) {
-  console.warn('[EMAIL] WARNING: BREVO_SENDER_EMAIL is not defined in environment variables.');
-}
-
 const getBaseTemplate = (content) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -43,15 +32,23 @@ const getBaseTemplate = (content) => `
 </html>
 `;
 
+/**
+ * Common sender helper using Brevo HTTP API
+ */
 const sendBrevoEmail = async (toEmail, toName, subject, htmlContent) => {
-  if (!apiKey || !emailSender) {
-    throw new Error('Email service configuration missing (BREVO_API_KEY or BREVO_SENDER_EMAIL)');
+  const apiKey = (process.env.BREVO_API_KEY || '').trim();
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || '').trim();
+
+  if (!apiKey || !senderEmail) {
+    const errorMsg = "[BREVO] Missing BREVO_API_KEY or BREVO_SENDER_EMAIL environment variable.";
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const payload = {
     sender: {
-      name: 'EduVerse AI',
-      email: emailSender
+      name: "EduVerse AI",
+      email: senderEmail
     },
     to: [
       {
@@ -64,27 +61,27 @@ const sendBrevoEmail = async (toEmail, toName, subject, htmlContent) => {
   };
 
   try {
-    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
       headers: {
-        'accept': 'application/json',
-        'api-key': apiKey,
-        'content-type': 'application/json'
+        "accept": "application/json",
+        "api-key": apiKey,
+        "content-type": "application/json"
       },
       body: JSON.stringify(payload)
     });
 
-    const responseData = await response.json();
+    const data = await response.json();
 
     if (!response.ok) {
-      console.error('[EMAIL] Brevo API Error response:', responseData);
-      throw new Error(`Brevo API returned status ${response.status}: ${responseData.message || JSON.stringify(responseData)}`);
+      console.error(`[BREVO] Failed to send email to ${toEmail}. Status: ${response.status}`, data);
+      throw new Error(data.message || `Brevo API error: ${response.status}`);
     }
 
-    console.log(`[EMAIL] Email sent successfully to ${toEmail}. MessageId: ${responseData.messageId}`);
-    return responseData;
+    console.log(`[BREVO] Email sent successfully to ${toEmail}. MessageId: ${data.messageId}`);
+    return data;
   } catch (error) {
-    console.error(`[EMAIL] Failed to send email to ${toEmail}:`, error.message);
+    console.error(`[BREVO] Network or API error during send to ${toEmail}:`, error.message);
     throw error;
   }
 };
@@ -97,8 +94,7 @@ exports.sendOTPEmail = async (email, name, otp) => {
     <p style="color: #ef4444; font-size: 14px;"><strong>This code expires in 10 minutes.</strong></p>
     <p>If you didn't request this, you can safely ignore this email.</p>
   `;
-
-  return sendBrevoEmail(email, name, 'Your EduVerse AI Verification Code', getBaseTemplate(content));
+  return sendBrevoEmail(email, name, "Your EduVerse AI Verification Code", getBaseTemplate(content));
 };
 
 exports.sendPasswordResetEmail = async (email, name, resetLink) => {
@@ -111,8 +107,7 @@ exports.sendPasswordResetEmail = async (email, name, resetLink) => {
     <p style="color: #ef4444; font-size: 14px;"><strong>This link expires in 15 minutes.</strong></p>
     <p>If you didn't request a password reset, please secure your account immediately.</p>
   `;
-
-  return sendBrevoEmail(email, name, 'Reset Your EduVerse AI Password', getBaseTemplate(content));
+  return sendBrevoEmail(email, name, "Reset Your EduVerse AI Password", getBaseTemplate(content));
 };
 
 exports.sendWelcomeEmail = async (email, name) => {
@@ -130,6 +125,5 @@ exports.sendWelcomeEmail = async (email, name) => {
       <a href="${process.env.FRONTEND_URL || 'https://edu-verse-frontend-vert.vercel.app'}/dashboard" class="btn">Go to Dashboard</a>
     </div>
   `;
-
-  return sendBrevoEmail(email, name, 'Welcome to EduVerse AI', getBaseTemplate(content));
+  return sendBrevoEmail(email, name, "Welcome to EduVerse AI", getBaseTemplate(content));
 };
