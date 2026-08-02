@@ -7,7 +7,7 @@ const User = require("../models/User");
 const { protect } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
 const { updateStreak } = require("../utils/streak");
-const emailService = require("../utils/emailService");
+const { sendOtpEmail } = require("../utils/emailSender");
 const rateLimit = require("express-rate-limit");
 
 const resendOtpLimiter = rateLimit({
@@ -74,21 +74,17 @@ router.post("/register", async (req, res) => {
     
     console.log(`[AUTH] Registration successful for ${savedUser.email}, OTP generated`);
 
-    // Await email delivery — surface failures to the user instead of swallowing silently
-    let emailSent = false;
+    // Send OTP using Brevo HTTP API
     try {
-      await emailService.sendOTPEmail(savedUser.email, savedUser.name, otp);
-      emailSent = true;
-      console.log(`[AUTH] OTP email sent successfully to ${savedUser.email}`);
+      await sendOtpEmail(savedUser.email, otp);
     } catch (emailErr) {
       console.error(`[AUTH] Failed to send OTP email to ${savedUser.email}:`, emailErr.message);
+      return res.status(500).json({ success: false, message: "Failed to send OTP email. Please try again." });
     }
 
     res.status(201).json({ 
       success: true, 
-      message: emailSent 
-        ? "OTP sent to your email" 
-        : "Account created but email delivery failed. Please use Resend OTP.",
+      message: "OTP sent to your email",
       userId: savedUser._id 
     });
   } catch (err) {
@@ -158,7 +154,6 @@ router.post("/verify-otp", async (req, res) => {
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
 
-    emailService.sendWelcomeEmail(user.email, user.name).catch(console.error);
     await createNotification(user._id, 'WELCOME', `Welcome to EduVerse, ${user.name}!`);
 
     res.json({
@@ -201,9 +196,13 @@ router.post("/resend-otp", resendOtpLimiter, async (req, res) => {
     user.otpAttempts = 0;
     await user.save();
 
-    emailService.sendOTPEmail(user.email, user.name, otp).catch(console.error);
-
-    res.json({ success: true, message: "New OTP sent" });
+    try {
+      await sendOtpEmail(user.email, otp);
+      res.json({ success: true, message: "New OTP sent" });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ success: false, message: "Failed to send OTP email. Please try again." });
+    }
   } catch (err) {
     console.error("Resend OTP error:", err);
     res.status(500).json({ success: false, message: "Server error during OTP resend" });
@@ -241,7 +240,12 @@ router.post("/login", async (req, res) => {
       user.otpExpiry = Date.now() + 10 * 60 * 1000;
       user.otpAttempts = 0;
       await user.save();
-      emailService.sendOTPEmail(user.email, user.name, otp).catch(console.error);
+      try {
+        await sendOtpEmail(user.email, otp);
+      } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Failed to send OTP email. Please try again." });
+      }
 
       return res.status(403).json({ 
         success: false, 
@@ -306,7 +310,6 @@ router.post("/forgot-password", async (req, res) => {
     await user.save();
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
-    emailService.sendPasswordResetEmail(user.email, user.name, resetLink).catch(console.error);
 
     res.json({ success: true, message: "If this email is registered, a reset link has been sent" });
   } catch (err) {
