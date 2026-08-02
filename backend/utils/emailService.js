@@ -10,6 +10,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify SMTP connection on startup — surfaces credential/config errors immediately
+transporter.verify()
+  .then(() => console.log("[EMAIL] SMTP transporter verified — Gmail connection OK"))
+  .catch((err) => console.error("[EMAIL] SMTP transporter verification FAILED:", err.message));
+
 const getBaseTemplate = (content) => `
 <!DOCTYPE html>
 <html lang="en">

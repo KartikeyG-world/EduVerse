@@ -72,14 +72,23 @@ router.post("/register", async (req, res) => {
 
     const savedUser = await newUser.save();
     
-    console.log(`[AUTH] Registration successful for ${savedUser.email}, OTP generated: ${otp}`);
-    emailService.sendOTPEmail(savedUser.email, savedUser.name, otp).catch((emailErr) => {
-      console.error("Failed to send OTP email:", emailErr);
-    });
+    console.log(`[AUTH] Registration successful for ${savedUser.email}, OTP generated`);
+
+    // Await email delivery — surface failures to the user instead of swallowing silently
+    let emailSent = false;
+    try {
+      await emailService.sendOTPEmail(savedUser.email, savedUser.name, otp);
+      emailSent = true;
+      console.log(`[AUTH] OTP email sent successfully to ${savedUser.email}`);
+    } catch (emailErr) {
+      console.error(`[AUTH] Failed to send OTP email to ${savedUser.email}:`, emailErr.message);
+    }
 
     res.status(201).json({ 
       success: true, 
-      message: "OTP sent to your email", 
+      message: emailSent 
+        ? "OTP sent to your email" 
+        : "Account created but email delivery failed. Please use Resend OTP.",
       userId: savedUser._id 
     });
   } catch (err) {
