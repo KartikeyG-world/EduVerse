@@ -1,18 +1,22 @@
 const nodemailer = require('nodemailer');
 
+const emailUser = (process.env.EMAIL_USER || '').trim().replace(/^["']|["']$/g, '');
+const emailPass = (process.env.EMAIL_PASS || '').trim().replace(/^["']|["']$/g, '');
+
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: emailUser,
+    pass: emailPass,
   },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100
 });
 
 // Verify SMTP connection on startup — surfaces credential/config errors immediately
 transporter.verify()
-  .then(() => console.log("[EMAIL] SMTP transporter verified — Gmail connection OK"))
+  .then(() => console.log(`[EMAIL] SMTP transporter verified successfully for: ${emailUser}`))
   .catch((err) => console.error("[EMAIL] SMTP transporter verification FAILED:", err.message));
 
 const getBaseTemplate = (content) => `
@@ -59,13 +63,15 @@ exports.sendOTPEmail = async (email, name, otp) => {
   `;
 
   const mailOptions = {
-    from: '"EduVerse AI" <' + process.env.EMAIL_USER + '>',
+    from: `"EduVerse AI" <${emailUser}>`,
     to: email,
     subject: "Your EduVerse AI Verification Code",
     html: getBaseTemplate(content),
   };
 
-  await transporter.sendMail(mailOptions);
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[EMAIL] OTP sent to ${email}. MessageId: ${info.messageId}`);
+  return info;
 };
 
 exports.sendPasswordResetEmail = async (email, name, resetLink) => {
@@ -80,13 +86,15 @@ exports.sendPasswordResetEmail = async (email, name, resetLink) => {
   `;
 
   const mailOptions = {
-    from: '"EduVerse AI" <' + process.env.EMAIL_USER + '>',
+    from: `"EduVerse AI" <${emailUser}>`,
     to: email,
     subject: "Reset Your EduVerse AI Password",
     html: getBaseTemplate(content),
   };
 
-  await transporter.sendMail(mailOptions);
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[EMAIL] Password reset sent to ${email}. MessageId: ${info.messageId}`);
+  return info;
 };
 
 exports.sendWelcomeEmail = async (email, name) => {
@@ -101,16 +109,18 @@ exports.sendWelcomeEmail = async (email, name) => {
       <li style="color: #cbd5e1;">📈 Skill Tracking & Analytics</li>
     </ul>
     <div style="text-align: center;">
-      <a href="${process.env.FRONTEND_URL}/dashboard" class="btn">Go to Dashboard</a>
+      <a href="${process.env.FRONTEND_URL || 'https://edu-verse-frontend-vert.vercel.app'}/dashboard" class="btn">Go to Dashboard</a>
     </div>
   `;
 
   const mailOptions = {
-    from: '"EduVerse AI" <' + process.env.EMAIL_USER + '>',
+    from: `"EduVerse AI" <${emailUser}>`,
     to: email,
     subject: "Welcome to EduVerse AI",
     html: getBaseTemplate(content),
   };
 
-  await transporter.sendMail(mailOptions);
+  const info = await transporter.sendMail(mailOptions);
+  console.log(`[EMAIL] Welcome email sent to ${email}. MessageId: ${info.messageId}`);
+  return info;
 };
