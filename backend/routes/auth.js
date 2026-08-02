@@ -7,7 +7,7 @@ const User = require("../models/User");
 const { protect } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
 const { updateStreak } = require("../utils/streak");
-const { sendOtpEmail } = require("../utils/emailSender");
+const { sendOtpEmail, sendWelcomeEmail } = require("../utils/emailSender");
 const rateLimit = require("express-rate-limit");
 
 const resendOtpLimiter = rateLimit({
@@ -155,6 +155,7 @@ router.post("/verify-otp", async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
 
     await createNotification(user._id, 'WELCOME', `Welcome to EduVerse, ${user.name}!`);
+    sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
 
     res.json({
       success: true,
