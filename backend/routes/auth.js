@@ -63,7 +63,7 @@ router.post("/register", async (req, res) => {
     const newUser = new User({
       name,
       email,
-      phone: phone || null,
+      phone: phone || undefined,
       password: hashedPassword,
       otp: hashedOTP,
       otpExpiry: Date.now() + 10 * 60 * 1000,
@@ -72,7 +72,10 @@ router.post("/register", async (req, res) => {
 
     const savedUser = await newUser.save();
     
-    emailService.sendOTPEmail(savedUser.email, savedUser.name, otp).catch(console.error);
+    console.log(`[AUTH] Registration successful for ${savedUser.email}, OTP generated: ${otp}`);
+    emailService.sendOTPEmail(savedUser.email, savedUser.name, otp).catch((emailErr) => {
+      console.error("Failed to send OTP email:", emailErr);
+    });
 
     res.status(201).json({ 
       success: true, 
@@ -81,7 +84,14 @@ router.post("/register", async (req, res) => {
     });
   } catch (err) {
     console.error("Registration error:", err);
-    res.status(500).json({ success: false, message: "Server error during registration" });
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(400).json({ 
+        success: false, 
+        message: `An account with this ${field} already exists.` 
+      });
+    }
+    res.status(500).json({ success: false, message: err.message || "Server error during registration" });
   }
 });
 
