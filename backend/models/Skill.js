@@ -45,6 +45,22 @@ const skillSchema = new mongoose.Schema({
   },
   videos: [{ type: String }],
   completedVideos: [{ type: String }],
+      playlistData: {
+        playlistId: { type: String, default: null },
+        totalVideos: { type: Number, default: 0 },
+        totalDurationSecs: { type: Number, default: 0 },
+        currentVideoIndex: { type: Number, default: 0 },
+        lastWatchedTimestamp: { type: Number, default: 0 },
+        videos: [{
+          title: { type: String, required: true },
+          videoId: { type: String, required: true },
+          duration: { type: String, default: '' },
+          durationSecs: { type: Number, default: 0 },
+          thumbnail: { type: String, default: null },
+          isCompleted: { type: Boolean, default: false },
+          lastWatchedTimestamp: { type: Number, default: 0 }
+        }]
+      },
   // Total video duration in seconds (captured from YouTube Player on first play)
   totalDuration: {
     type: Number,
@@ -77,7 +93,12 @@ const skillSchema = new mongoose.Schema({
 // Note: Mongoose 9+ uses async middleware (no next() callback)
 skillSchema.pre('save', async function () {
   if (this.type === 'playlist') {
-    if (this.videos && this.videos.length > 0) {
+    if (this.playlistData && this.playlistData.videos && this.playlistData.videos.length > 0) {
+      const total = this.playlistData.videos.length;
+      const completedCount = this.playlistData.videos.filter(v => v.isCompleted).length;
+      const rawProgress = (completedCount / total) * 100;
+      this.progress = Math.min(100, Math.max(0, Math.round(rawProgress)));
+    } else if (this.videos && this.videos.length > 0) {
       const rawProgress = (this.completedVideos.length / this.videos.length) * 100;
       this.progress = Math.min(100, Math.max(0, Math.round(rawProgress)));
     } else {

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Clock, Trophy, Zap, AlertCircle,
   CheckCircle, BookOpen, ChevronRight, Brain, Timer, Square, Play,
-  List, ChevronDown, ChevronUp
+  List,
 } from 'lucide-react';
 import api from '../utils/api';
 import QuizModal from '../components/ui/QuizModal';
@@ -19,7 +19,7 @@ import PremiumButton from '../components/ui/PremiumButton';
 const extractYouTubeId = (url) => {
   if (!url) return null;
   const match = url.match(
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&\n?#]+)/
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^\&\n?#]+)/
   );
   return match ? match[1] : null;
 };
@@ -118,15 +118,17 @@ const LearningView = () => {
   const [isSaving, setIsSaving]         = useState(false);
 
   // Quiz state
-  const [showQuiz, setShowQuiz]         = useState(false);
+  const [showQuiz, setShowQuiz]           = useState(false);
   const [quizQuestions, setQuizQuestions] = useState([]);
-  const [quizLoading, setQuizLoading]   = useState(false);
-  const hasWatchedEnough = watchedSecs > 60; // require at least 1 min before offering quiz
+  const [quizLoading, setQuizLoading]     = useState(false);
+  // For playlists, quiz is always available on Finish/Back.
+  // For single videos, require at least 60 s watched.
+  const hasWatchedEnough = skill?.type === 'playlist' ? true : watchedSecs > 60;
 
   // Focus Context
-  const { 
-    startStopwatchSession, 
-    pauseStopwatchSession, 
+  const {
+    startStopwatchSession,
+    pauseStopwatchSession,
     endStopwatchSession,
     activeSessionId,
     stopwatchTime
@@ -135,13 +137,13 @@ const LearningView = () => {
   const isThisSessionActive = activeSessionId === sessionId;
 
   const { triggerFeedback } = useContext(CompanionContext);
-  const { isAuthenticated, requireAuth } = useContext(AuthContext);
+  const { isAuthenticated } = useContext(AuthContext);
 
-  const playerRef      = useRef(null);   // YT.Player instance
-  const containerRef   = useRef(null);   // div for player mount
-  const intervalRef    = useRef(null);   // 10s save interval
+  const playerRef          = useRef(null);   // YT.Player instance
+  const containerRef       = useRef(null);   // div for player mount
+  const intervalRef        = useRef(null);   // 10s save interval
   const inactivityTimerRef = useRef(null);
-  const progressRef    = useRef({ watchedSecs: 0, totalSecs: 0, completed: false });
+  const progressRef        = useRef({ watchedSecs: 0, totalSecs: 0, completed: false });
 
   // ── Smart Inactivity System ──
   const [isInactive, setIsInactive] = useState(false);
@@ -149,7 +151,7 @@ const LearningView = () => {
     const resetInactivity = () => {
       setIsInactive(false);
       clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = setTimeout(() => setIsInactive(true), 120000); // 2 minutes
+      inactivityTimerRef.current = setTimeout(() => setIsInactive(true), 120000); // 2 min
     };
     window.addEventListener('mousemove', resetInactivity);
     window.addEventListener('keydown',   resetInactivity);
@@ -163,10 +165,6 @@ const LearningView = () => {
 
   // Sync Focus Mode Timer with video/activity state
   useEffect(() => {
-    // Logic: 
-    // Always track if playing. 
-    // If paused, track ONLY if active (note-taking).
-    // If paused AND inactive, pause the tracker.
     if (isPlaying) {
       startStopwatchSession(sessionId);
     } else {
@@ -191,7 +189,7 @@ const LearningView = () => {
     const fetchSkill = async () => {
       if (!isAuthenticated) {
         setLoading(false);
-        setError("Please sign in to access this learning session.");
+        setError('Please sign in to access this learning session.');
         return;
       }
       try {
@@ -200,8 +198,16 @@ const LearningView = () => {
         setProgress(res.data.progress || 0);
 
         if (res.data.type === 'playlist') {
-          const uncompleted = res.data.videos?.find(vId => !res.data.completedVideos?.includes(vId));
-          setActiveVideoId(uncompleted || res.data.videos?.[0] || extractYouTubeId(res.data.videoUrl));
+          // Priority 1: Resume from exact saved index
+          const savedIndex = res.data.playlistData?.currentVideoIndex || 0;
+          let targetVideoId = res.data.videos?.[savedIndex];
+
+          // Priority 2: Fall back to first uncompleted video
+          if (!targetVideoId || res.data.completedVideos?.includes(targetVideoId)) {
+            targetVideoId = res.data.videos?.find(vId => !res.data.completedVideos?.includes(vId));
+          }
+
+          setActiveVideoId(targetVideoId || res.data.videos?.[0] || extractYouTubeId(res.data.videoUrl));
         } else {
           setActiveVideoId(extractYouTubeId(res.data.videoUrl));
           setWatchedSecs(res.data.watchedDuration || 0);
@@ -210,7 +216,7 @@ const LearningView = () => {
           progressRef.current.totalSecs   = res.data.totalDuration || 0;
         }
 
-        progressRef.current.completed   = res.data.completed || false;
+        progressRef.current.completed = res.data.completed || false;
       } catch (err) {
         setError('Could not load this skill. It may have been deleted.');
       } finally {
@@ -218,36 +224,66 @@ const LearningView = () => {
       }
     };
     fetchSkill();
-  }, [id]);
+  }, [id, isAuthenticated]);
 
+  // ── Switch to a specific video in a playlist ──
   const moveToVideo = (vId) => {
     setActiveVideoId(vId);
     setWatchedSecs(0);
     setProgress(0);
     setIsPlaying(false);
     setShowQuiz(false);
+    // Clear previous quiz so the new lesson generates a fresh set
     setQuizQuestions([]);
-    // Update progressRef for the new video
+    // Reset progress tracking for the new video
     progressRef.current.watchedSecs = 0;
     progressRef.current.totalSecs = 0;
+    progressRef.current.completed = false;
   };
 
+  // ── Advance to the next playlist video (or navigate away if last) ──
+  // Uses a callback ref pattern to avoid stale-closure bugs with activeVideoId
   const moveToNextVideo = useCallback(() => {
     if (!skill || !skill.videos) return;
-    const currentIndex = skill.videos.indexOf(activeVideoId);
-    if (currentIndex !== -1 && currentIndex < skill.videos.length - 1) {
-      moveToVideo(skill.videos[currentIndex + 1]);
-    } else {
-      navigate('/skills');
-    }
-  }, [skill, activeVideoId, navigate]);
+    setActiveVideoId((currentVid) => {
+      const currentIndex = skill.videos.indexOf(currentVid);
+      if (currentIndex !== -1 && currentIndex < skill.videos.length - 1) {
+        const nextVid = skill.videos[currentIndex + 1];
+        // Reset state for the next video
+        setWatchedSecs(0);
+        setProgress(0);
+        setIsPlaying(false);
+        setShowQuiz(false);
+        setQuizQuestions([]);
+        progressRef.current.watchedSecs = 0;
+        progressRef.current.totalSecs = 0;
+        progressRef.current.completed = false;
+        return nextVid;
+      }
+      // Last video — navigate away. We can't call navigate() inside setState,
+      // so we schedule it after the current render cycle.
+      setTimeout(() => navigate('/skills'), 0);
+      return currentVid; // keep current until navigation fires
+    });
+  }, [skill, navigate]);
 
   // ── Generate quiz questions from AI ──
   const generateQuiz = useCallback(async () => {
-    if (!skill || quizLoading || quizQuestions.length > 0) return;
+    // Guard: don't start a second generation while one is in flight
+    if (!skill || quizLoading) return;
+    // If questions already loaded for this video, reuse them (don't regenerate)
+    if (quizQuestions.length > 0) return;
+
     setQuizLoading(true);
     try {
-      const prompt = `Generate exactly 5 multiple-choice quiz questions about the topic: "${skill.title}" (category: ${skill.category}).
+      const currentLesson = skill.type === 'playlist'
+        ? skill.playlistData?.videos?.find(v => v.videoId === activeVideoId)
+        : null;
+      const topicTitle = currentLesson?.title
+        ? `${currentLesson.title} (${skill.title})`
+        : skill.title;
+
+      const prompt = `Generate exactly 5 multiple-choice quiz questions about the topic: "${topicTitle}" (category: ${skill.category}).
 IMPORTANT: The primary language MUST be English, but provide a Hindi translation for each field.
 
 Return ONLY a valid JSON array with this exact structure, no extra text:
@@ -266,9 +302,9 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
       const res = await api.post('/ai/chat', { message: prompt, history: [], isSystemMessage: true });
       const raw = res.data.reply;
 
-      // Extract JSON robustly
+      // Extract JSON robustly — match a JSON array anywhere in the response
       const jsonMatch = raw.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-      if (!jsonMatch) throw new Error('No JSON found in AI response');
+      if (!jsonMatch) throw new Error('No JSON array found in AI response');
       const parsed = JSON.parse(jsonMatch[0]);
 
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -276,11 +312,13 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
       }
     } catch (err) {
       console.warn('Quiz generation failed:', err.message);
+      // On failure, reset so the user isn't left stuck on a loading spinner
+      setQuizQuestions([]);
     } finally {
       setQuizLoading(false);
       triggerFeedback({ type: COMPANION_EVENTS.QUIZ_START });
     }
-  }, [skill, quizLoading, quizQuestions.length, triggerFeedback]);
+  }, [skill, quizLoading, quizQuestions.length, triggerFeedback, activeVideoId]);
 
   // ── Save quiz attempt to backend ──
   const saveQuizAttempt = async (score, total) => {
@@ -291,47 +329,66 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
     }
   };
 
-  // ── Handle End Class Button ──
+  // ── Unified post-quiz navigation ──
+  // BUG 4 FIX: Both playlist and single-video modes ALWAYS navigate to /skills
+  // after the quiz closes (submit or skip). The mid-playlist auto-play-next is
+  // a separate auto-play mechanic triggered when a video ENDS naturally, NOT
+  // when the user actively leaves via Finish/Back.
+  const handlePostQuizNav = useCallback(() => {
+    setShowQuiz(false);
+    setQuizQuestions([]);
+    navigate('/skills');
+  }, [navigate]);
+
+  // ── Handle "Finish" / End Class button ──
   const handleEndClass = () => {
-    // 1. Force video pause
+    // 1. Pause video
     if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
       playerRef.current.pauseVideo();
     }
-    
-    // 2. Stop stopwatch safely
+
+    // 2. Stop focus stopwatch
     endStopwatchSession(sessionId);
 
-    // 3. Save session current progress immediately
+    // 3. Save current progress
+    //    For playlist: do NOT mark the video as complete just because the user
+    //    clicked Finish. Only mark complete when the video actually ends.
     if (playerRef.current && !progressRef.current.completed) {
-       if (skill.type === 'playlist') {
-         saveProgress(null, null, activeVideoId);
-       } else {
-         const currentTime = playerRef.current.getCurrentTime?.() || 0;
-         if (currentTime > progressRef.current.watchedSecs) {
-           progressRef.current.watchedSecs = currentTime;
-           setWatchedSecs(currentTime);
-         }
-         saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
-       }
+      const currentTime = playerRef.current.getCurrentTime?.() || 0;
+      if (skill.type !== 'playlist') {
+        if (currentTime > progressRef.current.watchedSecs) {
+          progressRef.current.watchedSecs = currentTime;
+          setWatchedSecs(currentTime);
+        }
+        saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
+      } else {
+        // Playlist: Save exact timestamp before ending class
+        const currentIndex = skill.videos?.indexOf(activeVideoId) || 0;
+        saveProgress(null, null, {
+          videoId: activeVideoId,
+          currentVideoIndex: currentIndex,
+          lastWatchedTimestamp: Math.floor(currentTime)
+        });
+      }
     }
 
-    // 4. Trigger quiz immediately if watched enough
+    // 4. Offer quiz, or navigate away if they haven't watched enough
     if (hasWatchedEnough && !showQuiz) {
       generateQuiz();
       setShowQuiz(true);
     } else {
-      // 5. Edge case message
-      triggerFeedback({ 
+      triggerFeedback({
         type: COMPANION_EVENTS.CLASS_ENDED_EARLY,
         data: { module: 'SkillHub' }
       });
+      navigate('/skills');
     }
   };
 
-  // ── Handle back navigation (offer quiz if enough watched) ──
+  // ── Handle back arrow navigation ──
   const handleBack = () => {
-    endStopwatchSession(sessionId); // Stop and save time immediately
-    
+    endStopwatchSession(sessionId);
+
     if (hasWatchedEnough && !showQuiz) {
       generateQuiz();
       setShowQuiz(true);
@@ -340,22 +397,29 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
     }
   };
 
-  const handleNextVideoResult = () => {
-    setShowQuiz(false);
-    moveToNextVideo();
-  };
-
   // ── Save progress to backend ──
-  const saveProgress = useCallback(async (watched, total, completedVideoId = null) => {
-    if (!isAuthenticated || (progressRef.current.completed && !completedVideoId)) return; // locked or guest
+  const saveProgress = useCallback(async (watched, total, videoCompletionInfo = null) => {
+    if (!isAuthenticated) return;
 
     let body = {};
     if (skill?.type === 'playlist') {
-      if (completedVideoId) body.completedVideoId = completedVideoId;
+      if (typeof videoCompletionInfo === 'object' && videoCompletionInfo !== null) {
+        if (videoCompletionInfo.videoId) body.videoId = videoCompletionInfo.videoId;
+        if (videoCompletionInfo.isCompleted !== undefined) body.isCompleted = videoCompletionInfo.isCompleted;
+        if (videoCompletionInfo.lastWatchedTimestamp !== undefined) body.lastWatchedTimestamp = videoCompletionInfo.lastWatchedTimestamp;
+        if (videoCompletionInfo.currentVideoIndex !== undefined) body.currentVideoIndex = videoCompletionInfo.currentVideoIndex;
+      } else if (typeof videoCompletionInfo === 'string') {
+        body.completedVideoId = videoCompletionInfo;
+        body.isCompleted = true;
+        body.lastWatchedTimestamp = 0;
+      } else {
+        return;
+      }
     } else {
+      if (progressRef.current.completed) return;
       const effectiveWatched = watched ?? progressRef.current.watchedSecs;
       const effectiveTotal   = total   ?? progressRef.current.totalSecs;
-      if (effectiveTotal === 0 && !completedVideoId) return;
+      if (effectiveTotal === 0 && !videoCompletionInfo) return;
       body = {
         watchedDuration: Math.floor(effectiveWatched),
         totalDuration:   Math.floor(effectiveTotal),
@@ -369,13 +433,10 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
       setProgress(newProgress);
       setLastSaved(new Date());
 
-      // Update skill state with new completedVideos if playlist
       if (res.data.type === 'playlist') {
-        const cv = res.data.completedVideos || [];
-        setSkill((prev) => ({ ...prev, completedVideos: cv }));
+        setSkill(res.data);
       }
 
-      // Trigger completion
       if (res.data.completed && !progressRef.current.completed) {
         progressRef.current.completed = true;
         setShowComplete(true);
@@ -386,9 +447,17 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
     } finally {
       setIsSaving(false);
     }
-  }, [id]);
+  }, [id, isAuthenticated, skill?.type]);
 
-  // ── Initialize YouTube Player after skill loads ──
+  // ── Toggle individual video completion from the sidebar ──
+  const toggleVideoCompletion = (e, videoId, currentDoneStatus) => {
+    e.stopPropagation();
+    saveProgress(null, null, { videoId, isCompleted: !currentDoneStatus });
+  };
+
+  // ── Initialize YouTube Player ──
+  // BUG 2 FIX: activeVideoId is in the dependency array so the player is fully
+  // destroyed and recreated each time the user switches to a different lesson.
   useEffect(() => {
     if (!skill || !activeVideoId) return;
 
@@ -397,8 +466,10 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
     loadYouTubeAPI().then((YT) => {
       if (!containerRef.current) return;
 
+      // Destroy any previous player instance before creating a new one
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch (_) {}
+        playerRef.current = null;
       }
 
       player = new YT.Player(containerRef.current, {
@@ -417,27 +488,33 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
         events: {
           onReady: (event) => {
             playerRef.current = event.target;
-            
+
             if (skill.type !== 'playlist') {
               const dur = event.target.getDuration();
               if (dur > 0) {
                 setTotalSecs(dur);
                 progressRef.current.totalSecs = dur;
               }
+              // Resume from last watched position (if > 10s to avoid micro-seeks)
               const resumeAt = progressRef.current.watchedSecs;
               if (resumeAt > 10) {
                 event.target.seekTo(resumeAt, true);
               }
             } else {
-               // Playlist: simply start playing or start from 0
+              // Playlist: start from last watched position
+              const currentVidItem = skill.playlistData?.videos?.find(v => v.videoId === activeVideoId);
+              const resumeAt = currentVidItem?.lastWatchedTimestamp || 0;
+              if (resumeAt > 10) {
+                event.target.seekTo(resumeAt, true);
+              }
             }
           },
 
           onStateChange: (event) => {
-            const YT = window.YT;
-            if (!YT) return;
+            const YTState = window.YT;
+            if (!YTState) return;
 
-            if (event.data === YT.PlayerState.PLAYING) {
+            if (event.data === YTState.PlayerState.PLAYING) {
               setIsPlaying(true);
 
               if (skill.type !== 'playlist') {
@@ -448,14 +525,15 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
                 }
               }
 
-              // Start periodic save every 10 seconds
+              // Periodic save every 10 seconds
               clearInterval(intervalRef.current);
               intervalRef.current = setInterval(() => {
                 if (!playerRef.current || progressRef.current.completed) return;
-                
+
+                const currentTime = playerRef.current.getCurrentTime();
+
                 if (skill.type !== 'playlist') {
-                  const currentTime = playerRef.current.getCurrentTime();
-                  const duration    = playerRef.current.getDuration();
+                  const duration = playerRef.current.getDuration();
 
                   if (currentTime > progressRef.current.watchedSecs) {
                     progressRef.current.watchedSecs = currentTime;
@@ -466,49 +544,100 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
                     setTotalSecs(duration);
                   }
 
-                  const localPct = Math.min(100, Math.round((progressRef.current.watchedSecs / progressRef.current.totalSecs) * 100));
+                  const localPct = Math.min(
+                    100,
+                    Math.round((progressRef.current.watchedSecs / progressRef.current.totalSecs) * 100)
+                  );
                   setProgress(localPct);
                   saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
+                } else {
+                  const currentIndex = skill.videos?.indexOf(activeVideoId) || 0;
+                  saveProgress(null, null, {
+                    videoId: activeVideoId,
+                    currentVideoIndex: currentIndex,
+                    lastWatchedTimestamp: Math.floor(currentTime)
+                  });
                 }
               }, 10000);
 
-            } else if (event.data === YT.PlayerState.PAUSED) {
+            } else if (event.data === YTState.PlayerState.PAUSED) {
               setIsPlaying(false);
               clearInterval(intervalRef.current);
 
-              if (skill.type !== 'playlist' && !progressRef.current.completed) {
+              if (!progressRef.current.completed) {
                 const currentTime = playerRef.current?.getCurrentTime() || 0;
-                const duration    = playerRef.current?.getDuration() || 0;
-                if (currentTime > progressRef.current.watchedSecs) {
-                  progressRef.current.watchedSecs = currentTime;
-                  setWatchedSecs(currentTime);
+                
+                if (skill.type !== 'playlist') {
+                  const duration = playerRef.current?.getDuration() || 0;
+                  if (currentTime > progressRef.current.watchedSecs) {
+                    progressRef.current.watchedSecs = currentTime;
+                    setWatchedSecs(currentTime);
+                  }
+                  if (duration > 0) {
+                    progressRef.current.totalSecs = duration;
+                    setTotalSecs(duration);
+                  }
+                  saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
+                } else {
+                  const currentIndex = skill.videos?.indexOf(activeVideoId) || 0;
+                  saveProgress(null, null, {
+                    videoId: activeVideoId,
+                    currentVideoIndex: currentIndex,
+                    lastWatchedTimestamp: Math.floor(currentTime)
+                  });
                 }
-                if (duration > 0) {
-                  progressRef.current.totalSecs = duration;
-                  setTotalSecs(duration);
-                }
-                saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
               }
 
-            } else if (event.data === YT.PlayerState.ENDED) {
+            } else if (event.data === YTState.PlayerState.ENDED) {
               setIsPlaying(false);
               clearInterval(intervalRef.current);
 
               if (skill.type === 'playlist') {
-                saveProgress(null, null, activeVideoId);
-                
-                // --- Auto Play Next Support ---
-                const currentIndex = skill.videos.indexOf(activeVideoId);
-                const isLast = currentIndex === skill.videos.length - 1;
-                
-                if (!isLast) {
-                  // Small delay for smooth transition
-                  setTimeout(() => {
-                    moveToNextVideo();
-                  }, 2000);
-                  return;
-                }
+                // Mark this video as complete on natural end and reset timestamp
+                const currentIndex = skill.videos?.indexOf(activeVideoId) || 0;
+                saveProgress(null, null, {
+                  videoId: activeVideoId,
+                  currentVideoIndex: currentIndex,
+                  isCompleted: true,
+                  lastWatchedTimestamp: 0
+                });
+
+                // Auto-play next — but only on natural end, not on Finish/Back
+                setActiveVideoId((currentVid) => {
+                  const currentIndex = skill.videos.indexOf(currentVid);
+                  const isLast = currentIndex === skill.videos.length - 1;
+
+                  if (!isLast) {
+                    const nextVid = skill.videos[currentIndex + 1];
+                    setTimeout(() => {
+                      setWatchedSecs(0);
+                      setProgress(0);
+                      setIsPlaying(false);
+                      setShowQuiz(false);
+                      setQuizQuestions([]);
+                      progressRef.current.watchedSecs = 0;
+                      progressRef.current.totalSecs = 0;
+                      progressRef.current.completed = false;
+                    }, 0);
+                    return nextVid;
+                  }
+                  // Last video — fall through to show quiz below
+                  return currentVid;
+                });
+
+                // Only show end-of-course quiz when it's the last video
+                setActiveVideoId((currentVid) => {
+                  const currentIndex = skill.videos.indexOf(currentVid);
+                  if (currentIndex === skill.videos.length - 1) {
+                    // End of playlist — offer quiz
+                    generateQuiz();
+                    setShowQuiz(true);
+                  }
+                  return currentVid; // no change
+                });
+                return; // Return here — auto-play handles navigation
               } else {
+                // Single video ended
                 const duration = playerRef.current?.getDuration() || progressRef.current.totalSecs;
                 progressRef.current.watchedSecs = duration;
                 setWatchedSecs(duration);
@@ -516,7 +645,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
                 saveProgress(duration, duration);
               }
 
-              // Auto-trigger quiz on video end (or last video of playlist)
+              // Single video: auto-trigger quiz on end
               generateQuiz();
               setShowQuiz(true);
             }
@@ -526,21 +655,32 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
     });
 
     return () => {
-      // Cleanup: save on unmount
+      // Save progress and clean up on unmount or on activeVideoId change
       clearInterval(intervalRef.current);
-      if (playerRef.current && !progressRef.current.completed && skill?.type !== 'playlist') {
+      if (playerRef.current && !progressRef.current.completed) {
         try {
           const currentTime = playerRef.current.getCurrentTime?.() || 0;
-          if (currentTime > progressRef.current.watchedSecs) {
-            progressRef.current.watchedSecs = currentTime;
+          if (skill?.type !== 'playlist') {
+            if (currentTime > progressRef.current.watchedSecs) {
+              progressRef.current.watchedSecs = currentTime;
+            }
+            saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
+          } else {
+            const currentIndex = skill.videos?.indexOf(activeVideoId) || 0;
+            saveProgress(null, null, {
+              videoId: activeVideoId,
+              currentVideoIndex: currentIndex,
+              lastWatchedTimestamp: Math.floor(currentTime)
+            });
           }
-          saveProgress(progressRef.current.watchedSecs, progressRef.current.totalSecs);
         } catch (_) {}
       }
       try { player?.destroy(); } catch (_) {}
       playerRef.current = null;
     };
-  }, [skill, saveProgress]);
+  // activeVideoId in deps triggers full player re-init on video switch
+  // Omitted skill and saveProgress to prevent remounts during periodic saves
+  }, [activeVideoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading / Error states ──
   if (loading) {
@@ -563,8 +703,8 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
           </div>
           <p className="text-white font-bold text-xl">{error || 'Skill not found'}</p>
           <p className="text-gray-400 text-sm">
-            {!isAuthenticated 
-              ? "You must be logged in to view your learning sessions and track progress."
+            {!isAuthenticated
+              ? 'You must be logged in to view your learning sessions and track progress.'
               : "We couldn't find the requested skill or you don't have permission to view it."}
           </p>
           <div className="flex flex-col gap-3 pt-4">
@@ -642,7 +782,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
             )}
           </AnimatePresence>
 
-          {/* Mini progress */}
+          {/* Mini progress bar */}
           <div className="flex items-center gap-2">
             <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
               <motion.div
@@ -673,7 +813,9 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
           <div className="px-6 py-3 bg-black/60 border-t border-white/5">
             {skill.type === 'playlist' ? (
               <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
-                <span className="tabular-nums">Playing item {(skill.videos?.indexOf(activeVideoId) || 0) + 1} of {skill.videos?.length || 0}</span>
+                <span className="tabular-nums">
+                  Playing item {(skill.videos?.indexOf(activeVideoId) || 0) + 1} of {skill.videos?.length || 0}
+                </span>
                 <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden shadow-inner hidden md:block">
                   <motion.div
                     className={`h-full rounded-full ${isComplete ? 'bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]' : 'bg-gradient-to-r from-primary via-accent to-secondary'}`}
@@ -701,7 +843,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
           {skill.type === 'playlist' && (
             <div className="px-6 py-4 bg-surface/30 border-t border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button 
+                <button
                   onClick={() => setShowQueue(!showQueue)}
                   className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
                 >
@@ -724,7 +866,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
         </div>
 
         {/* Sidebar panel */}
-        <ScrollReveal 
+        <ScrollReveal
           delay={0.1}
           x={20}
           className="w-full lg:w-80 xl:w-96 bg-surface/20 border-t lg:border-t-0 lg:border-l border-white/5 flex flex-col backdrop-blur-sm"
@@ -792,12 +934,12 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
             )}
 
             {/* Status card */}
-             <div className={`glass-card-hover overflow-hidden relative ${isComplete
-               ? 'border-yellow-400/30'
-               : isThisSessionActive
-               ? 'border-accent/30 shadow-[0_0_30px_rgba(var(--accent),0.1)]'
-               : 'border-white/5'}`}
-             >
+            <div className={`glass-card-hover overflow-hidden relative ${isComplete
+              ? 'border-yellow-400/30'
+              : isThisSessionActive
+              ? 'border-accent/30 shadow-[0_0_30px_rgba(var(--accent),0.1)]'
+              : 'border-white/5'}`}
+            >
               <div className="flex items-center gap-2 relative z-10">
                 {isComplete ? (
                   <><CheckCircle size={16} className="text-yellow-400 flex-shrink-0" /><span className="text-yellow-400 font-bold text-sm">Skill Mastered — +500 XP!</span></>
@@ -808,12 +950,12 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
                       {formatTime(stopwatchTime)}
                     </span>
                     <PremiumButton>
-                        <button 
+                      <button
                         onClick={handleEndClass}
                         className="px-2.5 py-1 text-xs bg-red-500/20 text-red-100 rounded-lg hover:bg-red-500 hover:text-white transition-all flex items-center gap-1 border border-red-500/30"
-                        >
+                      >
                         <Square size={10} fill="currentColor" /> Finish
-                        </button>
+                      </button>
                     </PremiumButton>
                   </>
                 ) : !isPlaying && isInactive ? (
@@ -824,19 +966,19 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
               </div>
               {!isComplete && progress > 0 && (
                 <p className="text-gray-500 text-[10px] mt-3 uppercase tracking-tighter opacity-70">
-                   Autosave Active • Level Up Imminent
+                  Autosave Active • Level Up Imminent
                 </p>
               )}
             </div>
 
-            {/* How tracking works (Regular) */}
+            {/* Tracking protocol info (single-video only) */}
             {skill.type !== 'playlist' && !isComplete && (
               <div className="bg-surface/30 border border-white/5 rounded-xl p-4 space-y-2 mt-auto">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Protocol</p>
                 <ul className="space-y-1.5 text-[11px] text-gray-500 font-medium">
-                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-primary"/> Saves every 10s via secure node</li>
-                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-accent"/> Multi-point resumption synced</li>
-                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500"/> 95% threshold for XP reward</li>
+                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-primary" /> Saves every 10s via secure node</li>
+                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-accent" /> Multi-point resumption synced</li>
+                  <li className="flex items-center gap-2"><div className="w-1 h-1 rounded-full bg-emerald-500" /> 95% threshold for XP reward</li>
                 </ul>
               </div>
             )}
@@ -846,33 +988,73 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-3 px-1">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Course Structure</p>
-                  <span className="text-[10px] text-primary font-bold">{skill.completedVideos?.length || 0}/{skill.videos?.length || 0} Done</span>
+                  <span className="text-[10px] text-primary font-bold">
+                    {skill.playlistData?.videos
+                      ? skill.playlistData.videos.filter(v => v.isCompleted).length
+                      : (skill.completedVideos?.length || 0)
+                    }/{skill.playlistData?.videos?.length || skill.videos?.length || 0} Done
+                  </span>
                 </div>
-                <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-                  {skill.videos?.map((vid, idx) => {
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                  {(skill.playlistData?.videos || skill.videos?.map(vid => ({
+                    videoId: vid,
+                    title: 'Lesson',
+                    isCompleted: skill.completedVideos?.includes(vid),
+                  })))?.map((item, idx) => {
+                    const vid      = item.videoId || item;
+                    const vTitle   = item.title || `Lesson ${idx + 1}`;
                     const isVidActive = vid === activeVideoId;
-                    const isVidDone   = skill.completedVideos?.includes(vid);
+                    const isVidDone   = item.isCompleted || skill.completedVideos?.includes(vid);
+                    const vThumb   = item.thumbnail || `https://img.youtube.com/vi/${vid}/hqdefault.jpg`;
+                    const vDuration = item.duration;
+
                     return (
-                      <button
-                        key={vid}
+                      <div
+                        key={`${vid}-${idx}`}
                         onClick={() => moveToVideo(vid)}
-                        className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center gap-3 group
-                          ${isVidActive 
-                            ? 'bg-primary/10 border-primary/30 text-white' 
-                            : 'bg-white/3 border-transparent text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                        className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center gap-3 group cursor-pointer
+                          ${isVidActive
+                            ? 'bg-primary/10 border-primary/40 text-white shadow-lg shadow-primary/10'
+                            : 'bg-white/[0.03] border-white/5 text-gray-400 hover:bg-white/5 hover:text-white'}`}
                       >
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold
-                          ${isVidDone ? 'bg-emerald-500/20 text-emerald-400' : isVidActive ? 'bg-primary text-white' : 'bg-white/5 text-gray-500 group-hover:bg-white/10'}`}>
-                          {isVidDone ? <CheckCircle size={12} /> : idx + 1}
+                        {/* Thumbnail */}
+                        <div className="relative w-12 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-black/40 border border-white/10">
+                          <img
+                            src={vThumb}
+                            alt={vTitle}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          {isVidActive && (
+                            <div className="absolute inset-0 bg-primary/40 flex items-center justify-center">
+                              <Play size={14} className="fill-white text-white ml-0.5" />
+                            </div>
+                          )}
                         </div>
+
+                        {/* Title & duration */}
                         <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-semibold truncate ${isVidActive ? 'text-primary' : ''}`}>
-                            Lesson {idx + 1}
+                          <p className={`text-xs font-semibold truncate ${isVidActive ? 'text-primary font-bold' : 'text-gray-200'}`}>
+                            {idx + 1}. {vTitle}
                           </p>
-                          <p className="text-[10px] opacity-50 truncate">Video ID: {vid}</p>
+                          {vDuration && (
+                            <p className="text-[10px] text-gray-500 font-medium">{vDuration}</p>
+                          )}
                         </div>
-                        {isVidActive && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-                      </button>
+
+                        {/* Completion toggle */}
+                        <button
+                          onClick={(e) => toggleVideoCompletion(e, vid, isVidDone)}
+                          className={`p-1.5 rounded-lg border transition-all flex-shrink-0 ${
+                            isVidDone
+                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
+                              : 'bg-white/5 text-gray-500 border-white/10 hover:bg-white/10 hover:text-white'
+                          }`}
+                          title={isVidDone ? 'Mark as incomplete' : 'Mark as completed'}
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -883,6 +1065,10 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
       </div>
 
       {/* ── Quiz Modal ── */}
+      {/* BUG 4 FIX: ALL post-quiz navigation (onSkip, onClose after submit) calls
+          handlePostQuizNav which ALWAYS navigates to /skills — identical for both
+          playlist and single-video mode. Mid-playlist auto-advance only happens on
+          natural video end (in onStateChange.ENDED), not here. */}
       <AnimatePresence>
         {showQuiz && (
           quizLoading ? (
@@ -898,41 +1084,40 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
                   <Brain size={28} className="text-primary animate-pulse" />
                 </div>
                 <p className="text-white font-bold">Generating your quiz...</p>
-                <p className="text-gray-500 text-sm">AI is crafting questions based on this video</p>
+                <p className="text-gray-500 text-sm">AI is crafting questions based on this lesson</p>
               </div>
             </motion.div>
           ) : quizQuestions.length > 0 ? (
             <QuizModal
               skillTitle={skill?.title || ''}
               questions={quizQuestions}
-              onSkip={() => { 
+              onSkip={() => {
                 triggerFeedback({ type: COMPANION_EVENTS.QUIZ_SKIPPED, data: { module: 'SkillHub' } });
-                if (skill.type === 'playlist' && skill.videos.indexOf(activeVideoId) < skill.videos.length - 1) {
-                  handleNextVideoResult();
-                } else {
-                  setShowQuiz(false); 
-                  navigate('/skills'); 
-                }
+                handlePostQuizNav();
               }}
               onSubmit={async (score, total) => {
                 await saveQuizAttempt(score, total);
-                triggerFeedback({ 
-                  type: COMPANION_EVENTS.QUIZ_COMPLETE, 
-                  data: { percentage: Math.round((score / total) * 100) } 
+                triggerFeedback({
+                  type: COMPANION_EVENTS.QUIZ_COMPLETE,
+                  data: { percentage: Math.round((score / total) * 100) }
                 });
-                // modal will handle showing result; navigate after modal closes
+                // ResultScreen inside QuizModal handles the display;
+                // navigation fires when the user clicks "Back to Skills Hub" (onClose)
               }}
-              onClose={() => {
-                if (skill.type === 'playlist' && skill.videos.indexOf(activeVideoId) < skill.videos.length - 1) {
-                  handleNextVideoResult();
-                } else {
-                  navigate('/skills');
-                }
-              }}
+              onClose={handlePostQuizNav}
             />
           ) : (
-            // AI failed to generate — silently navigate back
-            <>{navigate('/skills')}</>
+            // AI failed to generate questions — close quiz and navigate away
+            // Use a useEffect-style pattern to avoid navigate() during render
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onAnimationComplete={() => {
+                setShowQuiz(false);
+                navigate('/skills');
+              }}
+            />
           )
         )}
       </AnimatePresence>

@@ -5,11 +5,89 @@ const User = require('../models/User');
 const { protect, optionalAuth } = require('../middlewares/auth');
 const { createNotification } = require('../utils/notification');
 const QuizAttempt = require('../models/QuizAttempt');
+const { updateTopicMastery } = require('../utils/mastery');
 const ytpl = require('ytpl');
 const axios = require('axios');
 
+// Helper to fetch playlist details via ytpl with YouTube API v3 fallback (full pagination)
+const fetchPlaylistDetails = async (playlistId) => {
+  // ── Primary: ytpl (limit: Infinity fetches all pages automatically) ──
+  try {
+    const playlist = await ytpl(playlistId, { limit: Infinity });
+    if (playlist && playlist.items && playlist.items.length > 0) {
+      console.log(`[Playlist] ytpl fetched ${playlist.items.length} videos for playlist ${playlistId}`);
+      return {
+        playlistId,
+        totalVideos: playlist.items.length,
+        title: playlist.title || null,
+        videos: playlist.items.map(item => ({
+          title: item.title,
+          videoId: item.id,
+          duration: item.duration || '',
+          thumbnail: item.bestThumbnail?.url || item.thumbnail || `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`,
+          isCompleted: false
+        }))
+      };
+    }
+  } catch (err) {
+    console.warn('[Playlist] ytpl fetch failed, trying YouTube Data API v3 fallback:', err.message);
+  }
+
+  // ── Fallback: YouTube Data API v3 with full nextPageToken pagination ──
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (apiKey) {
+    try {
+      const allItems = [];
+      let nextPageToken = null;
+
+      // Paginate through ALL pages until nextPageToken is null (last page)
+      do {
+        const params = {
+          part: 'snippet,contentDetails',
+          playlistId: playlistId,
+          maxResults: 50,
+          key: apiKey,
+        };
+        if (nextPageToken) params.pageToken = nextPageToken;
+
+        const res = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', { params });
+        const pageItems = res.data.items || [];
+        allItems.push(...pageItems);
+        nextPageToken = res.data.nextPageToken || null;
+
+        console.log(`[Playlist] YT API page fetched: ${pageItems.length} items, nextPageToken: ${nextPageToken || 'none'}`);
+      } while (nextPageToken);
+
+      if (allItems.length > 0) {
+        console.log(`[Playlist] YT API total fetched: ${allItems.length} videos for playlist ${playlistId}`);
+        return {
+          playlistId,
+          totalVideos: allItems.length,
+          videos: allItems
+            .filter(item => item.snippet?.resourceId?.videoId) // skip deleted/private
+            .map(item => ({
+              title: item.snippet.title,
+              videoId: item.snippet.resourceId.videoId,
+              duration: '',
+              thumbnail:
+                item.snippet.thumbnails?.high?.url ||
+                item.snippet.thumbnails?.medium?.url ||
+                item.snippet.thumbnails?.default?.url ||
+                `https://img.youtube.com/vi/${item.snippet.resourceId.videoId}/hqdefault.jpg`,
+              isCompleted: false
+            }))
+        };
+      }
+    } catch (apiErr) {
+      console.warn('[Playlist] YouTube Data API fallback failed:', apiErr.response?.data || apiErr.message);
+    }
+  }
+
+  return null;
+};
+
 // @route   POST /api/skills
-// @desc    Add a new skill with video tracking
+// @desc    Add a new skill with video/playlist tracking
 router.post('/', protect, async (req, res) => {
   try {
     const { title, category, videoUrl, source, difficulty, channelName, thumbnailUrl } = req.body;
@@ -20,26 +98,18 @@ router.post('/', protect, async (req, res) => {
 
     let type = 'video';
     let videos = [];
+    let playlistData = null;
 
-    // Playlist Detection — ONLY for explicit playlist URLs (no v= param present)
-    // URLs like youtube.com/watch?v=xyz&list=abc are treated as single videos
-    const hasVideoParam = /[?&]v=/.test(videoUrl);
-    const isExplicitPlaylist = !hasVideoParam && (videoUrl.includes('/playlist?') || videoUrl.includes('list='));
+    // Detect Playlist URL (contains list= parameter or /playlist?)
+    const playlistIdMatch = videoUrl.match(/[&?]list=([^&#]+)/) || videoUrl.match(/\/playlist\?list=([^&#]+)/);
+    const playlistId = playlistIdMatch ? playlistIdMatch[1] : null;
 
-    if (isExplicitPlaylist) {
-      try {
-        const playlistIdMatch = videoUrl.match(/[&?]list=([^&#]+)/);
-        const playlistId = playlistIdMatch ? playlistIdMatch[1] : null;
-
-        if (playlistId) {
-          const playlist = await ytpl(playlistId, { limit: Infinity });
-          if (playlist && playlist.items && playlist.items.length > 0) {
-            type = 'playlist';
-            videos = playlist.items.map(item => item.id);
-          }
-        }
-      } catch (ytplErr) {
-        console.warn('Playlist fetch failed, falling back to video mode:', ytplErr.message);
+    if (playlistId) {
+      const fetchedPlaylist = await fetchPlaylistDetails(playlistId);
+      if (fetchedPlaylist && fetchedPlaylist.videos.length > 0) {
+        type = 'playlist';
+        playlistData = fetchedPlaylist;
+        videos = fetchedPlaylist.videos.map(v => v.videoId);
       }
     }
 
@@ -50,6 +120,7 @@ router.post('/', protect, async (req, res) => {
       videoUrl,
       type,
       videos,
+      ...(playlistData && { playlistData }),
       ...(source       && { source }),
       ...(difficulty   && { difficulty }),
       ...(channelName  && { channelName }),
@@ -164,23 +235,54 @@ router.get('/:id', protect, async (req, res) => {
 // @desc    Update watched duration and recompute progress via pre-save hook
 router.put('/:id/progress', protect, async (req, res) => {
   try {
-    const { watchedDuration, totalDuration, completedVideoId } = req.body;
+    const { watchedDuration, totalDuration, videoId, isCompleted, completedVideoId, currentVideoIndex, lastWatchedTimestamp } = req.body;
     const skill = await Skill.findOne({ _id: req.params.id, userId: req.user.id });
 
     if (!skill) {
       return res.status(404).json({ message: 'Skill not found' });
     }
 
-    // Never allow progress to go backward (high-water mark)
+    // Lock updates after completion (high-water mark — never go backward)
     if (skill.completed) {
-      return res.json(skill); // Lock updates after completion
+      return res.json(skill);
     }
 
-    const wasCompleted = skill.completed;
+    // Track pre-save state to detect newly-completed skills for XP reward
+    const wasCompleted = false; // Always false here — we returned above if already completed
 
-    if (skill.type === 'playlist' && completedVideoId) {
-      if (!skill.completedVideos.includes(completedVideoId)) {
-        skill.completedVideos.push(completedVideoId);
+    if (skill.type === 'playlist') {
+      const targetVid = videoId || completedVideoId;
+
+      if (skill.playlistData) {
+        if (currentVideoIndex !== undefined) skill.playlistData.currentVideoIndex = currentVideoIndex;
+        if (lastWatchedTimestamp !== undefined) skill.playlistData.lastWatchedTimestamp = lastWatchedTimestamp;
+        skill.markModified('playlistData');
+      }
+
+      if (targetVid) {
+        let shouldComplete = null;
+        if (isCompleted !== undefined) {
+          shouldComplete = Boolean(isCompleted);
+        } else if (completedVideoId) {
+          shouldComplete = true;
+        }
+
+        if (skill.playlistData && skill.playlistData.videos) {
+          const vidItem = skill.playlistData.videos.find(v => v.videoId === targetVid);
+          if (vidItem) {
+            if (shouldComplete !== null) vidItem.isCompleted = shouldComplete;
+            if (lastWatchedTimestamp !== undefined) vidItem.lastWatchedTimestamp = lastWatchedTimestamp;
+          }
+          skill.markModified('playlistData');
+        }
+
+        if (shouldComplete === true) {
+          if (!skill.completedVideos.includes(targetVid)) {
+            skill.completedVideos.push(targetVid);
+          }
+        } else if (shouldComplete === false) {
+          skill.completedVideos = skill.completedVideos.filter(v => v !== targetVid);
+        }
       }
     }
 
@@ -256,11 +358,9 @@ router.post('/:id/quiz', protect, async (req, res) => {
 
     await attempt.save();
 
-    // Hook into Mastery Engine
-    // For now, use skill title as topic and category as category
-    const { updateTopicMastery } = require('../utils/mastery');
+    // Hook into Mastery Engine — track per-topic mastery scores
     await updateTopicMastery(req.user.id, skill.title, skill.category, {
-      isCorrect: percentage >= 70, // Assume 70% is "correct" for the topic overall
+      isCorrect: percentage >= 70,
       confidence: percentage,
       difficulty: skill.difficulty || 'medium'
     });

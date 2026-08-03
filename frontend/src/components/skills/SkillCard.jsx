@@ -49,7 +49,27 @@ const DIFFICULTY_STYLES = {
 
 const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
   const navigate = useNavigate();
-  const { _id, title, category, progress, completed, watchedDuration, totalDuration, type, videos, completedVideos, difficulty, source, channelName, thumbnailUrl } = skill;
+  const { _id, title, category, progress, completed, watchedDuration, totalDuration, type, videos, completedVideos, playlistData, difficulty, source, channelName, thumbnailUrl, videoUrl } = skill;
+
+  const totalLessons = playlistData?.videos?.length || videos?.length || 0;
+  const doneLessons = playlistData?.videos
+    ? playlistData.videos.filter(v => v.isCompleted).length
+    : (completedVideos?.length || 0);
+
+  // Resolve a thumbnail to display — prefer stored thumbnailUrl, then derive from
+  // playlist first-video thumbnail, then extract from the videoUrl itself.
+  const extractVideoIdFromUrl = (url) => {
+    if (!url) return null;
+    const m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  };
+  const resolvedThumbnail =
+    thumbnailUrl ||
+    playlistData?.videos?.[0]?.thumbnail ||
+    (() => {
+      const vid = extractVideoIdFromUrl(videoUrl);
+      return vid ? `https://img.youtube.com/vi/${vid}/hqdefault.jpg` : null;
+    })();
 
   const progressColor = completed
     ? 'from-yellow-400 to-amber-500'
@@ -96,12 +116,13 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
       </div>
 
       <div>
-        {/* Thumbnail (if available) */}
-        {thumbnailUrl && (
+        {/* Thumbnail — shows for all skills with a resolvable thumbnail */}
+        {resolvedThumbnail && (
           <img 
-            src={thumbnailUrl} 
+            src={resolvedThumbnail} 
             alt={title} 
             className="aspect-video w-full object-cover rounded-xl mb-4 border border-white/5 shadow-md"
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
         )}
 
@@ -142,7 +163,7 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
               <Play size={10} className="fill-accent" /> Playlist Course
             </div>
             <p className="text-[11px] text-gray-400 font-medium">
-              {videos?.length || 0} Lessons • {completedVideos?.length || 0} Complete
+              {totalLessons} Lessons • {doneLessons} Complete
             </p>
           </div>
         ) : totalDuration > 0 ? (

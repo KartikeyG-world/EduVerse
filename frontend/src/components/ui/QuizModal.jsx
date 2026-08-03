@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, XCircle, ArrowRight, SkipForward, Trophy, RefreshCcw, Languages } from 'lucide-react';
+import { CheckCircle2, ArrowRight, SkipForward, Trophy, RefreshCcw, Languages } from 'lucide-react';
 
 // ─── Static backdrop overlay ─────────────────────────────────────────────────
 const Overlay = ({ children }) => (
