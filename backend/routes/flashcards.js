@@ -12,9 +12,10 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 /** Shared OpenRouter call (mirrors ai.js helper, but kept separate to avoid coupling) */
 const callAI = async (messages) => {
+  const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
   const response = await axios.post(
     OPENROUTER_URL,
-    { model: 'openai/gpt-3.5-turbo', messages },
+    { model: 'openai/gpt-3.5-turbo', messages, max_tokens: MAX_TOKENS },
     {
       headers: {
         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY}`,
@@ -115,7 +116,7 @@ ${plainText.substring(0, 3000)}`,
       return res.status(500).json({ success: false, message: 'AI returned invalid flashcard structure.' });
     }
 
-    // Save all flashcards to DB
+    // Save all flashcards to DB (Phase 2 global study queue)
     const docs = pairs.map((p) => ({
       userId: req.user.id,
       topicName,
@@ -129,6 +130,16 @@ ${plainText.substring(0, 3000)}`,
     }));
 
     const saved = await Flashcard.insertMany(docs);
+
+    // Also embed into Note directly (Phase 1 legacy / immediate viewing)
+    if (noteId) {
+      const Note = require('../models/Note');
+      const embeddedCards = pairs.map(p => ({
+        question: p.front?.trim() || 'Question',
+        answer: p.back?.trim() || 'Answer'
+      }));
+      await Note.findByIdAndUpdate(noteId, { $push: { flashcards: { $each: embeddedCards } } });
+    }
 
     res.status(201).json({ success: true, flashcards: saved, count: saved.length });
   } catch (err) {

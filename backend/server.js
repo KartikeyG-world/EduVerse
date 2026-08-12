@@ -24,7 +24,10 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, health checks)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    
+    // Dynamically allow any localhost port in development to prevent CORS issues if port 5173 is occupied
+    const isLocalhost = /^http:\/\/localhost(:\d+)?$/.test(origin);
+    if (isLocalhost || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     return callback(null, false);
@@ -63,10 +66,16 @@ app.use("/api/chat", require("./routes/chat"));
 
 const PORT = process.env.PORT || 5000;
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("Connected to MongoDB Atlas");
-    app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => console.error("MongoDB connection error:", err));
+// Start listening immediately so health checks work and port conflicts/errors are reported instantly
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
+  
+  // Connect to MongoDB Atlas in the background
+  mongoose
+    .connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected to MongoDB Atlas"))
+    .catch((err) => {
+      console.error("MongoDB connection error:", err);
+      console.error("Please verify that your current IP address is whitelisted on MongoDB Atlas (Network Access).");
+    });
+});

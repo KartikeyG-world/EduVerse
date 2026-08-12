@@ -2,6 +2,14 @@ import React, { memo, useEffect, useState, useMemo } from 'react';
 import Particles, { initParticlesEngine } from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 
+// Read computed CSS variable as rgb hex
+const getCSSColor = (varName) => {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  if (!raw) return '#6366f1';
+  const [r, g, b] = raw.split(' ').map(Number);
+  return `rgb(${r},${g},${b})`;
+};
+
 
 //  ParticleBackground
 //  mode: 'ambient' (dashboard/general) | 'focus' (Focus Mode — more intense)
@@ -9,6 +17,14 @@ import { loadSlim } from '@tsparticles/slim';
 const ParticleBackground = memo(({ mode = 'ambient' }) => {
   const [init, setInit] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  // Re-read CSS vars when theme changes
+  const [themeKey, setThemeKey] = useState(0);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setThemeKey(k => k + 1));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -27,14 +43,16 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
     });
   }, []);
 
-  const ambientOptions = useMemo(() => ({
-    fullScreen: false,
-    background: { color: { value: 'transparent' } },
+  const ambientOptions = useMemo(() => {
+    const isStarlight = document.documentElement.getAttribute('data-theme') === 'starlight-galaxy';
+    return {
+      fullScreen: false,
+      background: { color: { value: 'transparent' } },
     fpsLimit: isMobile ? 30 : 40,
     particles: {
-      number: { value: isMobile ? 12 : 38, density: { enable: true, area: 900 } },
-      color: { value: ['#6366f1', '#06b6d4', '#8b5cf6'] },
-      shape: { type: 'circle' },
+      number: { value: isStarlight ? (isMobile ? 25 : 80) : (isMobile ? 12 : 38), density: { enable: true, area: 900 } },
+      color: { value: [getCSSColor('--color-primary'), getCSSColor('--color-accent'), getCSSColor('--color-secondary')] },
+      shape: { type: isStarlight ? 'star' : 'circle' },
       opacity: {
         value: 0.18,
         random: true,
@@ -55,22 +73,25 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
       links: {
         enable: !isMobile,
         distance: 130,
-        color: '#6366f1',
+        color: getCSSColor('--color-primary'),
         opacity: 0.07,
         width: 1,
       },
     },
     detectRetina: !isMobile,
-  }), [isMobile]);
+    };
+  }, [isMobile, themeKey]);
 
-  const focusOptions = useMemo(() => ({
-    fullScreen: false,
-    background: { color: { value: 'transparent' } },
+  const focusOptions = useMemo(() => {
+    const isStarlight = document.documentElement.getAttribute('data-theme') === 'starlight-galaxy';
+    return {
+      fullScreen: false,
+      background: { color: { value: 'transparent' } },
     fpsLimit: isMobile ? 40 : 50,
     particles: {
-      number: { value: isMobile ? 20 : 60, density: { enable: true, area: 800 } },
-      color: { value: ['#06b6d4', '#6366f1', '#a78bfa'] },
-      shape: { type: 'circle' },
+      number: { value: isStarlight ? (isMobile ? 40 : 120) : (isMobile ? 20 : 60), density: { enable: true, area: 800 } },
+      color: { value: [getCSSColor('--color-accent'), getCSSColor('--color-primary'), getCSSColor('--color-secondary')] },
+      shape: { type: isStarlight ? 'star' : 'circle' },
       opacity: {
         value: 0.25,
         random: true,
@@ -92,19 +113,21 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
       links: {
         enable: !isMobile,
         distance: 150,
-        color: '#06b6d4',
+        color: getCSSColor('--color-accent'),
         opacity: 0.12,
         width: 1,
       },
     },
     detectRetina: !isMobile,
-  }), [isMobile]);
+    };
+  }, [isMobile, themeKey]);
 
   if (!init) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
       <Particles
+        key={`particles-${mode}-${themeKey}`}
         id={`particles-${mode}`}
         options={mode === 'focus' ? focusOptions : ambientOptions}
         className="w-full h-full absolute inset-0"

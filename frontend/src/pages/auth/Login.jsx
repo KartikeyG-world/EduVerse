@@ -6,6 +6,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { Lock, Mail, ArrowRight, Eye, EyeOff, Phone, Smartphone } from 'lucide-react';
 import { useToast } from '../../components/ui/ToastProvider';
+import SocialAuthButtons from '../../components/auth/SocialAuthButtons';
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
@@ -68,13 +69,13 @@ const Login = () => {
         <div className="flex bg-surface/50 p-1 rounded-xl border border-white/5 mb-6">
           <button
             onClick={() => { setLoginMethod('email'); setIdentifier(''); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${loginMethod === 'email' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${loginMethod === 'email' ? 'bg-primary text-primary-content' : 'text-gray-400 hover:text-white'}`}
           >
             <Mail size={14} /> Email
           </button>
           <button
             onClick={() => { setLoginMethod('phone'); setIdentifier(''); }}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${loginMethod === 'phone' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${loginMethod === 'phone' ? 'bg-primary text-primary-content' : 'text-gray-400 hover:text-white'}`}
           >
             <Phone size={14} /> Mobile
           </button>
@@ -135,7 +136,7 @@ const Login = () => {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] mt-2 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-content font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] mt-2 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -144,8 +145,10 @@ const Login = () => {
             )}
           </button>
         </form>
+
+        <SocialAuthButtons actionText="WITH SOCIAL" />
         
-        <div className="mt-10 pt-6 border-t border-white/5 text-center">
+        <div className="mt-6 pt-6 border-t border-white/5 text-center">
           <p className="text-gray-400 text-sm">
             Don't have an account? <Link to="/register" className="text-primary font-bold hover:underline">Sign Up</Link>
           </p>

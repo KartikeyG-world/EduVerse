@@ -129,8 +129,8 @@ const Analytics = () => {
               <XAxis dataKey="name" stroke="#9ca3af" tick={{ fill: '#9ca3af', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af', fontSize: 12 }} axisLine={false} tickLine={false} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
-                itemStyle={{ color: '#8b5cf6', fontWeight: 'bold' }}
+                contentStyle={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-white) / 0.1)', borderRadius: '8px', color: 'rgb(var(--color-white))' }}
+                itemStyle={{ color: 'rgb(var(--color-primary))', fontWeight: 'bold' }}
               />
               <Area type="monotone" dataKey="xp" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorXp)" animationDuration={2000} />
             </AreaChart>

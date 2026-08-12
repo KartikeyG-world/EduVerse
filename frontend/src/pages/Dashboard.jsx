@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../utils/api';
@@ -99,6 +100,10 @@ const Dashboard = () => {
         data: { name: user?.name } 
       });
     } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || "";
+      if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+        toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+      }
       if (err.response?.status !== 401) {
         console.error('Failed to load dashboard data', err);
       }
@@ -357,8 +362,8 @@ const Dashboard = () => {
                   <XAxis dataKey="day" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}m`} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(17,24,39,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px' }}
-                    itemStyle={{ color: '#fff' }}
+                    contentStyle={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-white) / 0.1)', borderRadius: '8px', color: 'rgb(var(--color-white))' }}
+                    itemStyle={{ color: 'rgb(var(--color-primary))', fontWeight: 'bold' }}
                   />
                   <Area 
                     type="monotone" 

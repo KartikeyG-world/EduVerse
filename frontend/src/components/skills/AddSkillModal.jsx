@@ -79,7 +79,7 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.93, y: 24 }}
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-        className="bg-[#0b1120] border border-white/10 shadow-2xl rounded-3xl w-full max-w-xl overflow-hidden relative"
+        className="bg-surface border border-white/10 shadow-2xl rounded-3xl w-full max-w-xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top accent bar */}
@@ -115,7 +115,7 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. React 19 Full Course"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm placeholder-gray-600"
+                    className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm placeholder-gray-500"
                   />
                 </div>
               </div>
@@ -130,10 +130,10 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm appearance-none cursor-pointer"
+                    className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white outline-none focus:border-primary/60 transition-colors text-sm appearance-none cursor-pointer"
                   >
                     {CATEGORIES.map((c) => (
-                      <option key={c} value={c} className="bg-[#0b1120]">{c}</option>
+                      <option key={c} value={c} className="bg-surface">{c}</option>
                     ))}
                   </select>
                 </div>
@@ -157,7 +157,7 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
                   value={videoUrl}
                   onChange={(e) => { setVideoUrl(e.target.value); setError(''); }}
                   placeholder="https://www.youtube.com/playlist?list=... or watch?v=..."
-                  className={`w-full bg-white/5 border rounded-xl py-3 pl-10 pr-10 text-white outline-none transition-colors text-sm placeholder-gray-600 ${
+                  className={`w-full bg-surface border rounded-xl py-3 pl-10 pr-10 text-white outline-none transition-colors text-sm placeholder-gray-500 ${
                     videoUrl.length > 0
                       ? isValidUrl ? 'border-accent/60 focus:border-accent' : 'border-red-500/50 focus:border-red-500'
                       : 'border-white/10 focus:border-primary/60'
@@ -227,7 +227,7 @@ const AddSkillModal = ({ onClose, onSkillAdded }) => {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading || !isValidUrl}
-              className="w-full bg-primary hover:bg-primary/80 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl py-3 font-bold shadow-[0_0_20px_rgba(99,102,241,0.2)] mt-1 flex justify-center items-center gap-2 transition-all"
+              className="w-full bg-primary hover:bg-primary/80 disabled:opacity-40 disabled:cursor-not-allowed text-primary-content rounded-xl py-3 font-bold shadow-[0_0_20px_rgba(99,102,241,0.2)] mt-1 flex justify-center items-center gap-2 transition-all"
             >
               {loading ? (
                 <><Loader2 size={18} className="animate-spin" /> Adding Skill...</>

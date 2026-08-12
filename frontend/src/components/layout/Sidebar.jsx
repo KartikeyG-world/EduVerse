@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../../context/AuthContext';
+import ThemeSwitcher from './ThemeSwitcher';
 
 const NAV_LINKS = [
   { name: 'Dashboard',      path: '/',        icon: <LayoutDashboard size={18} /> },
@@ -43,8 +44,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: -256, opacity: 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="w-64 flex-shrink-0 h-full border-r border-white/[0.06] flex flex-col pt-6 z-50 fixed lg:static top-0 left-0 bottom-0"
-      style={{ background: 'rgba(6,10,26,0.85)', backdropFilter: 'blur(20px)' }}
+      className="w-64 flex-shrink-0 h-full border-r border-white/[0.06] flex flex-col pt-6 z-50 fixed lg:static top-0 left-0 bottom-0 bg-background/90 backdrop-blur-xl"
     >
       {/* Logo */}
       <div className="px-6 mb-8 flex items-center justify-between">
@@ -85,7 +85,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               end={link.path === '/'}
               onClick={onClose} // Auto-close on mobile
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 lg:py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden group text-sm font-medium ${
+                `flex items-center gap-3 px-4 py-3 lg:py-2.5 rounded-xl transition-all duration-200 relative overflow-hidden group text-sm font-bold ${
                   isActive
                     ? 'text-white'
                     : 'text-gray-400 active:text-white active:bg-white/[0.04] md:hover:text-white md:hover:bg-white/[0.04]'
@@ -127,6 +127,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           </motion.div>
         ))}
       </nav>
+
+      {/* Theme Engine */}
+      <div className="px-4 mt-2">
+        <ThemeSwitcher />
+      </div>
 
       {/* Bottom user card */}
       <motion.div

@@ -9,6 +9,11 @@ const { createNotification } = require("../utils/notification");
 const { updateStreak } = require("../utils/streak");
 const { sendOtpEmail, sendWelcomeEmail } = require("../utils/emailSender");
 const rateLimit = require("express-rate-limit");
+const axios = require("axios");
+const { OAuth2Client } = require("google-auth-library");
+
+// Single reusable Google OAuth2 client — scoped to server lifetime
+const googleOAuthClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const resendOtpLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -256,6 +261,15 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Guard: Social-only users have no password — they must use their social provider
+    if (!user.password) {
+      const provider = user.authProvider || 'social';
+      return res.status(400).json({ 
+        success: false, 
+        message: `This account uses ${provider} login. Please use the "${provider === 'google' ? 'Continue with Google' : 'Continue with Facebook'}" button instead.` 
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
@@ -412,6 +426,235 @@ router.put("/update-profile", protect, async (req, res) => {
   } catch (err) {
     console.error("Update profile error:", err);
     res.status(500).json({ success: false, message: "Server error updating profile" });
+  }
+});
+
+// @route   POST /api/auth/google
+// @desc    Authenticate or register user with verified Google ID Token
+// SECURITY: Only accepts idToken. Backend verifies using google-auth-library.
+// Frontend-supplied user objects are NOT trusted.
+router.post("/google", async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken || typeof idToken !== 'string') {
+      return res.status(400).json({ success: false, message: "Google ID token is required" });
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      console.error("[AUTH] GOOGLE_CLIENT_ID environment variable is not set");
+      return res.status(500).json({ success: false, message: "Google authentication is not configured" });
+    }
+
+    // Verify the ID token using google-auth-library (cryptographic verification)
+    let ticket;
+    try {
+      ticket = await googleOAuthClient.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+    } catch (err) {
+      console.error("[AUTH] Google ID Token verification failed:", err.message);
+      return res.status(400).json({ success: false, message: "Invalid or expired Google token. Please try again." });
+    }
+
+    const payload = ticket.getPayload();
+    const googleId = payload.sub;
+    const email = payload.email;
+    const emailVerified = payload.email_verified;
+    const name = payload.name;
+    const picture = payload.picture;
+
+    // Reject if Google account email is not verified with Google
+    if (!emailVerified) {
+      return res.status(400).json({ success: false, message: "Your Google account email is not verified. Please verify it with Google first." });
+    }
+
+    if (!email || !googleId) {
+      return res.status(400).json({ success: false, message: "Google profile is missing required fields" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Account Deduplication: Find by googleId OR verified email
+    let user = await User.findOne({
+      $or: [{ googleId }, { email: normalizedEmail }]
+    });
+
+    let isNewUser = false;
+
+    if (user) {
+      // Link Google ID to existing account (e.g. local email/password user)
+      if (!user.googleId) {
+        user.googleId = googleId;
+      }
+      // Auto-verify email since Google confirmed it
+      if (!user.isVerified) {
+        user.isVerified = true;
+      }
+      // Set avatar if they don't have one yet
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+      }
+      user.lastLogin = Date.now();
+      user.loginAttempts = 0;
+      await user.save();
+    } else {
+      // New user — create account from verified Google profile
+      isNewUser = true;
+      user = new User({
+        name: name || "Google User",
+        email: normalizedEmail,
+        googleId,
+        authProvider: "google",
+        avatar: picture || "",
+        isVerified: true
+      });
+      await user.save();
+
+      await createNotification(user._id, 'WELCOME', `Welcome to EduVerse, ${user.name}!`);
+      sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
+    }
+
+    const updatedUser = await updateStreak(user);
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || "7d"
+    });
+
+    res.json({
+      success: true,
+      token,
+      isNewUser,
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar,
+        xp: updatedUser.xp,
+        level: updatedUser.level,
+        streak: updatedUser.streak || 0,
+        focusHours: updatedUser.focusHours || 0,
+        tutorPoints: updatedUser.tutorPoints || 0
+      }
+    });
+  } catch (err) {
+    console.error("Google authentication error:", err);
+    res.status(500).json({ success: false, message: "Server error during Google authentication" });
+  }
+});
+
+// @route   POST /api/auth/facebook
+// @desc    Authenticate or register user with verified Facebook Access Token
+// SECURITY: Only accepts accessToken. Backend verifies with Facebook Graph API.
+// Frontend-supplied user objects are NOT trusted.
+router.post("/facebook", async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken || typeof accessToken !== 'string') {
+      return res.status(400).json({ success: false, message: "Facebook access token is required" });
+    }
+
+    let facebookId, email, name, picture;
+
+    // Verify the access token by calling Facebook Graph API
+    // This cryptographically confirms the token is real and belongs to the user
+    try {
+      const fbRes = await axios.get(
+        `https://graph.facebook.com/v19.0/me?fields=id,name,email,picture.type(large)`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          timeout: 8000
+        }
+      );
+      facebookId = fbRes.data.id;
+      email = fbRes.data.email;
+      name = fbRes.data.name;
+      picture = fbRes.data.picture?.data?.url;
+    } catch (err) {
+      console.error("[AUTH] Facebook Token verification failed:", err.response?.data || err.message);
+      return res.status(400).json({ success: false, message: "Invalid or expired Facebook access token. Please try again." });
+    }
+
+    if (!facebookId) {
+      return res.status(400).json({ success: false, message: "Could not retrieve your Facebook profile" });
+    }
+
+    // Reject if no email — a verified email is required to avoid broken accounts
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Your Facebook account does not share an email address. Please grant email permission or use a different login method."
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Account Deduplication: Find by facebookId OR verified email
+    let user = await User.findOne({
+      $or: [{ facebookId }, { email: normalizedEmail }]
+    });
+
+    let isNewUser = false;
+
+    if (user) {
+      // Link Facebook ID to existing account
+      if (!user.facebookId) {
+        user.facebookId = facebookId;
+      }
+      if (!user.isVerified) {
+        user.isVerified = true;
+      }
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+      }
+      user.lastLogin = Date.now();
+      user.loginAttempts = 0;
+      await user.save();
+    } else {
+      // New user — create account from verified Facebook profile
+      isNewUser = true;
+      user = new User({
+        name: name || "Facebook User",
+        email: normalizedEmail,
+        facebookId,
+        authProvider: "facebook",
+        avatar: picture || "",
+        isVerified: true
+      });
+      await user.save();
+
+      await createNotification(user._id, 'WELCOME', `Welcome to EduVerse, ${user.name}!`);
+      sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
+    }
+
+    const updatedUser = await updateStreak(user);
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || "7d"
+    });
+
+    res.json({
+      success: true,
+      token,
+      isNewUser,
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar,
+        xp: updatedUser.xp,
+        level: updatedUser.level,
+        streak: updatedUser.streak || 0,
+        focusHours: updatedUser.focusHours || 0,
+        tutorPoints: updatedUser.tutorPoints || 0
+      }
+    });
+  } catch (err) {
+    console.error("Facebook authentication error:", err);
+    res.status(500).json({ success: false, message: "Server error during Facebook authentication" });
   }
 });
 

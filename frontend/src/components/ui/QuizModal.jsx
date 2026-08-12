@@ -23,7 +23,7 @@ const ResultScreen = ({ score, total, onClose }) => {
     <motion.div
       initial={{ scale: 0.85, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className="bg-[#0d1117] border border-white/10 rounded-3xl p-8 w-full max-w-md text-center shadow-2xl"
+      className="bg-surface border border-white/10 rounded-3xl p-8 w-full max-w-md text-center shadow-2xl"
     >
       {/* Icon */}
       <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 ${isGood ? 'bg-emerald-500/15' : 'bg-red-500/15'}`}>
@@ -58,7 +58,7 @@ const ResultScreen = ({ score, total, onClose }) => {
 
       <button
         onClick={onClose}
-        className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-2xl transition-all"
+        className="w-full bg-primary hover:bg-primary/90 text-primary-content font-bold py-3 rounded-2xl transition-all"
       >
         Back to Skills Hub
       </button>
@@ -118,7 +118,7 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 40, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-        className="bg-[#0d1117] border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden"
+        className="bg-surface border border-white/10 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-white/5 flex items-center justify-between">
@@ -186,7 +186,7 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
                           : 'bg-white/3 border-white/8 text-gray-300 hover:bg-white/8 hover:border-white/15 hover:text-white'
                       }`}
                     >
-                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg mr-3 text-xs font-black ${isSelected ? 'bg-primary text-white' : 'bg-white/10 text-gray-400'}`}>
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg mr-3 text-xs font-black ${isSelected ? 'bg-primary text-primary-content' : 'bg-white/10 text-gray-400'}`}>
                         {String.fromCharCode(65 + oIdx)}
                       </span>
                       {lang === 'hi' && q.optionsHindi?.[oIdx] ? q.optionsHindi[oIdx] : opt}
@@ -219,7 +219,7 @@ const QuizModal = ({ skillTitle, questions, onSubmit, onSkip, onClose }) => {
             <button
               onClick={handleSubmit}
               disabled={answered === 0}
-              className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(var(--primary),0.3)]"
+              className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-content text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(var(--primary),0.3)]"
             >
               Submit Quiz <CheckCircle2 size={16} />
             </button>

@@ -122,7 +122,7 @@ const SkillsHub = () => {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => requireAuth(() => setShowAddModal(true))}
-              className="bg-primary hover:bg-primary/90 text-white px-4 py-2.5 sm:py-2 rounded-full font-semibold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap min-h-[44px]"
+              className="bg-primary hover:bg-primary/90 text-primary-content px-4 py-2.5 sm:py-2 rounded-full font-semibold transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 w-full sm:w-auto whitespace-nowrap min-h-[44px]"
             >
               <Plus size={18} />
               <span>Add Skill</span>
@@ -231,7 +231,7 @@ const SkillsHub = () => {
           </p>
           <button
             onClick={() => requireAuth(() => {})}
-            className="mt-2 px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/80 transition-colors"
+            className="mt-2 px-6 py-2.5 bg-primary text-primary-content rounded-xl font-semibold hover:bg-primary/80 transition-colors"
           >
             Sign In / Register
           </button>
@@ -267,7 +267,7 @@ const SkillsHub = () => {
                     </p>
                     <button
                       onClick={() => setShowAddModal(true)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/80 transition-colors mt-1"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-content rounded-xl font-semibold hover:bg-primary/80 transition-colors mt-1"
                     >
                       <Plus size={16} /> Add First Skill
                     </button>

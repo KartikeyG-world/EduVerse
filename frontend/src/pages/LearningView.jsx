@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import toast from 'react-hot-toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -311,6 +312,10 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
         setQuizQuestions(parsed);
       }
     } catch (err) {
+      const errMsg = err.response?.data?.error || err.message || "";
+      if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+        toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+      }
       console.warn('Quiz generation failed:', err.message);
       // On failure, reset so the user isn't left stuck on a loading spinner
       setQuizQuestions([]);
@@ -711,14 +716,14 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
             {!isAuthenticated ? (
               <button
                 onClick={() => navigate('/login')}
-                className="w-full px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+                className="w-full px-6 py-3 bg-primary text-primary-content rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
               >
                 Sign In to Continue
               </button>
             ) : (
               <button
                 onClick={() => navigate('/skills')}
-                className="w-full px-6 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
+                className="w-full px-6 py-3 bg-primary text-primary-content rounded-xl font-bold hover:bg-primary/80 transition-all shadow-lg shadow-primary/20"
               >
                 Back to Skills Hub
               </button>
@@ -1132,7 +1137,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-4"
           >
-            <div className="bg-[#0f1a10] border border-yellow-400/30 rounded-2xl p-5 shadow-[0_0_60px_rgba(251,191,36,0.25)] flex items-start gap-4">
+            <div className="bg-surface border border-yellow-400/30 rounded-2xl p-5 shadow-[0_0_60px_rgba(251,191,36,0.25)] flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-yellow-400/20 flex items-center justify-center flex-shrink-0 text-2xl">
                 🏆
               </div>

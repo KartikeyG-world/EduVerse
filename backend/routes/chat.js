@@ -8,11 +8,13 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const openRouterCall = async (messages) => {
   try {
+    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
     const response = await axios.post(
       OPENROUTER_URL,
       {
         model: "openai/gpt-3.5-turbo",
-        messages: messages
+        messages: messages,
+        max_tokens: MAX_TOKENS
       },
       {
         headers: {
@@ -30,8 +32,13 @@ const openRouterCall = async (messages) => {
     }
 
     return data.choices[0].message.content;
-  } catch (err) {
-    throw new Error("OpenRouter API request failed");
+  } catch (error) {
+    const status = error?.response?.status;
+    const msg = error?.response?.data?.error?.message || error.message;
+
+    if (status === 402) throw new Error('AI_CREDIT_LIMIT: AI unavailable. Try again shortly.');
+    if (status === 429) throw new Error('AI_RATE_LIMIT: Too many requests. Wait and retry.');
+    throw new Error(msg);
   }
 };
 

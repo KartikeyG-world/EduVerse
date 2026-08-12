@@ -103,7 +103,7 @@ const PerformanceCalendar = ({ skillId, skillTitle, onClose }) => {
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 15 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="bg-[#0f141b] border border-white/10 rounded-3xl w-full max-w-5xl shadow-[0_0_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col md:flex-row"
+        className="bg-surface border border-white/10 rounded-3xl w-full max-w-5xl shadow-[0_0_100px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col md:flex-row"
       >
         
         {/* ── Left Pane: Calendar Grid ── */}

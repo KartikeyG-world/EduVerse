@@ -49,7 +49,7 @@ const Profile = () => {
         </p>
         <button 
           onClick={() => navigate('/login')}
-          className="w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl py-4 transition-all shadow-lg shadow-primary/20"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-content font-bold rounded-2xl py-4 transition-all shadow-lg shadow-primary/20"
         >
           Sign In
         </button>
@@ -109,7 +109,7 @@ const Profile = () => {
                     />
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <button onClick={handleSave} disabled={loading} className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-lg py-2 flex justify-center font-bold">
+                    <button onClick={handleSave} disabled={loading} className="flex-1 bg-primary hover:bg-primary/90 text-primary-content rounded-lg py-2 flex justify-center font-bold">
                       {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <Check size={18} />}
                     </button>
                     <button onClick={() => { setIsEditing(false); setName(user.name); setAvatar(user.avatar || ''); }} className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg py-2 flex justify-center">

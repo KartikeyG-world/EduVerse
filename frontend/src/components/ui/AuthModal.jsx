@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogIn, UserPlus, ShieldAlert } from 'lucide-react';
 import { AuthContext } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import SocialAuthButtons from '../auth/SocialAuthButtons';
 
 const AuthModal = () => {
     const { showAuthModal, closeAuthModal } = useContext(AuthContext);
@@ -27,7 +28,7 @@ const AuthModal = () => {
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.95, y: 20 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="bg-[#0b1120] border border-white/10 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden relative p-8 text-center"
+                        className="bg-surface border border-white/10 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden relative p-8 text-center"
                     >
                         {/* Header Gradient Accents */}
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-accent to-primary" />
@@ -54,7 +55,7 @@ const AuthModal = () => {
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => handleNavigate('/login')}
-                                className="w-full bg-primary hover:bg-primary/90 text-white rounded-xl py-3.5 font-bold shadow-[0_0_20px_rgba(var(--primary),0.3)] flex justify-center items-center gap-2 transition-all"
+                                className="w-full bg-primary hover:bg-primary/90 text-primary-content rounded-xl py-3.5 font-bold shadow-[0_0_20px_rgba(var(--primary),0.3)] flex justify-center items-center gap-2 transition-all"
                             >
                                 <LogIn size={18} /> Login to Account
                             </motion.button>
@@ -67,10 +68,12 @@ const AuthModal = () => {
                             >
                                 <UserPlus size={18} /> Create Free Account
                             </motion.button>
+
+                            <SocialAuthButtons actionText="WITH SOCIAL" />
                             
                             <button 
                                 onClick={() => closeAuthModal()}
-                                className="w-full text-gray-500 hover:text-white text-sm font-semibold pt-4 transition-colors"
+                                className="w-full text-gray-500 hover:text-white text-sm font-semibold pt-2 transition-colors"
                             >
                                 Maybe Later / Continue as Guest
                             </button>

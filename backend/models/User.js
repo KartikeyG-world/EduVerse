@@ -18,7 +18,24 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      return !this.googleId && !this.facebookId;
+    },
+  },
+  authProvider: {
+    type: String,
+    enum: ["local", "google", "facebook"],
+    default: "local",
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  facebookId: {
+    type: String,
+    unique: true,
+    sparse: true,
   },
   xp: {
     type: Number,

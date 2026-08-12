@@ -222,7 +222,7 @@ const SkillDiscovery = ({ onSkillAdded }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.99 }}
             transition={{ duration: 0.18 }}
-            className="absolute top-[calc(100%+8px)] left-0 right-0 z-[500] bg-[#0c1220] border border-white/10 rounded-2xl shadow-2xl shadow-black/60 backdrop-blur-xl overflow-hidden"
+            className="absolute top-[calc(100%+8px)] left-0 right-0 z-[500] bg-surface border border-white/10 rounded-2xl shadow-2xl shadow-black/60 backdrop-blur-xl overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">

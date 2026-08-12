@@ -161,7 +161,7 @@ const VerifyOTP = () => {
           <button 
             type="submit" 
             disabled={loading || timeLeft === 0 || otp.join('').length !== 6}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-content font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <>Verify Account <ArrowRight size={18} /></>}
           </button>

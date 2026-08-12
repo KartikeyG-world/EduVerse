@@ -12,11 +12,13 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // Helper for making OpenRouter API calls
 const openRouterCall = async (messages) => {
   try {
+    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
     const response = await axios.post(
       OPENROUTER_URL,
       {
         model: "openai/gpt-3.5-turbo",
-        messages: messages
+        messages: messages,
+        max_tokens: MAX_TOKENS
       },
       {
         headers: {
@@ -35,26 +37,65 @@ const openRouterCall = async (messages) => {
     }
 
     return data.choices[0].message.content;
-  } catch (err) {
-    if (err.response) {
-      console.error("OpenRouter API Failed:", err.response.data);
-    } else {
-      console.error("OpenRouter request error:", err.message);
-    }
-    throw new Error("OpenRouter API request failed");
+  } catch (error) {
+    const status = error?.response?.status;
+    const msg = error?.response?.data?.error?.message 
+                || error.message;
+
+    if (status === 402) throw new Error(
+      'AI_CREDIT_LIMIT: AI unavailable. Try again shortly.'
+    );
+    if (status === 429) throw new Error(
+      'AI_RATE_LIMIT: Too many requests. Wait and retry.'
+    );
+    throw new Error(msg);
   }
 };
 
-// Helper to clean JSON response
+// Helper to clean JSON response — gracefully handles truncated AI output
 const parseJSONSafely = (text) => {
+  // Step 1: Strip markdown fences
+  let cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+
+  // Step 2: Attempt a clean parse first (happy path)
   try {
-    let cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(cleaned);
-  } catch (error) {
-    console.error("Failed to parse JSON:", text);
-    throw new Error("Invalid JSON structure");
+  } catch (_) {
+    // Fell through — likely a truncated response. Attempt recovery below.
   }
+
+  // Step 3: Extract all fully-formed day objects from the truncated string.
+  // Each day block ends with a closing } before the next { "day": N or the end.
+  // We collect every complete { ... } object from inside the roadmap array.
+  try {
+    const dayObjects = [];
+    // Match each complete JSON object in the array (greedy, handles nested arrays)
+    const objectPattern = /\{\s*"day"\s*:\s*\d+[\s\S]*?"tasks"\s*:\s*\[[\s\S]*?\]\s*\}/g;
+    let match;
+    while ((match = objectPattern.exec(cleaned)) !== null) {
+      try {
+        const obj = JSON.parse(match[0]);
+        if (obj.day && obj.topic && Array.isArray(obj.tasks)) {
+          dayObjects.push(obj);
+        }
+      } catch (_) {
+        // Skip any malformed individual object
+      }
+    }
+
+    if (dayObjects.length > 0) {
+      console.warn(`[parseJSONSafely] Recovered ${dayObjects.length} day(s) from truncated AI response.`);
+      return { roadmap: dayObjects };
+    }
+  } catch (_) {
+    // Recovery also failed — fall through to hard error
+  }
+
+  // Step 4: Nothing recoverable — log and throw
+  console.error("Failed to parse JSON:", text);
+  throw new Error("Invalid JSON structure");
 };
+
 
 // AI Study Planner
 router.post("/planner", protect, async (req, res) => {

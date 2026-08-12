@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -96,7 +97,12 @@ const StudyPlanner = () => {
           setPlan(res.data.roadmap);
           fetchSavedPlans();
         } catch (err) {
-          alert("Failed to generate plan. Please check your OpenAI billing quota.");
+          const errMsg = err.response?.data?.error || err.message || "";
+          if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+            toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+          } else {
+            alert("Failed to generate plan. Please check your OpenAI billing quota.");
+          }
           console.error(err);
         } finally {
           setLoading(false);
@@ -139,7 +145,7 @@ const StudyPlanner = () => {
           <PremiumButton className="flex-1 md:flex-none">
             <button 
               onClick={() => setActiveTab('planner')}
-              className={`w-full px-6 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'planner' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+              className={`w-full px-6 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'planner' ? 'bg-primary text-primary-content shadow-lg' : 'text-gray-400 hover:text-white'}`}
             >
               AI Roadmap
             </button>
@@ -147,7 +153,7 @@ const StudyPlanner = () => {
           <PremiumButton className="flex-1 md:flex-none">
             <button 
               onClick={() => setActiveTab('routine')}
-              className={`w-full px-6 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'routine' ? 'bg-accent text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+              className={`w-full px-6 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === 'routine' ? 'bg-accent text-accent-content shadow-lg' : 'text-gray-400 hover:text-white'}`}
             >
               Daily Grid
             </button>
@@ -214,7 +220,7 @@ const StudyPlanner = () => {
                   <button 
                     type="submit" 
                     disabled={loading}
-                    className="w-full md:w-auto lg:w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-medium rounded-xl py-3 md:py-2.5 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 min-h-[44px]"
+                    className="w-full md:w-auto lg:w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-content font-medium rounded-xl py-3 md:py-2.5 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2 min-h-[44px]"
                   >
                     {loading ? <><Sparkles size={16} className="animate-spin" /> Generating...</> : <><Sparkles size={16} /> Generate</>}
                   </button>

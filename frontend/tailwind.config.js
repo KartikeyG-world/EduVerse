@@ -7,11 +7,29 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: "#0f172a", // Dark navy aesthetic
-        surface: "#1e293b",
-        primary: "#8b5cf6", // Violet neon accent
-        secondary: "#10b981", // Emerald accent
-        accent: "#f43f5e", // Rose accent
+        background: "rgb(var(--color-background) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        primary: "rgb(var(--color-primary) / <alpha-value>)",
+        'primary-content': "rgb(var(--color-primary-content) / <alpha-value>)",
+        secondary: "rgb(var(--color-secondary) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        'accent-content': "rgb(var(--color-accent-content) / <alpha-value>)",
+        white: "rgb(var(--color-white) / <alpha-value>)",
+        black: "rgb(var(--color-black) / <alpha-value>)",
+        'white-fixed': '#ffffff',
+        gray: {
+          50: "rgb(var(--color-gray-50) / <alpha-value>)",
+          100: "rgb(var(--color-gray-100) / <alpha-value>)",
+          200: "rgb(var(--color-gray-200) / <alpha-value>)",
+          300: "rgb(var(--color-gray-300) / <alpha-value>)",
+          400: "rgb(var(--color-gray-400) / <alpha-value>)",
+          500: "rgb(var(--color-gray-500) / <alpha-value>)",
+          600: "rgb(var(--color-gray-600) / <alpha-value>)",
+          700: "rgb(var(--color-gray-700) / <alpha-value>)",
+          800: "rgb(var(--color-gray-800) / <alpha-value>)",
+          900: "rgb(var(--color-gray-900) / <alpha-value>)",
+          950: "rgb(var(--color-gray-950) / <alpha-value>)",
+        },
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],

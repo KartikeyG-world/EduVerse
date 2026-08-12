@@ -84,7 +84,7 @@ const Topbar = ({ onMenuClick }) => {
           >
             <Bell size={20} className={unreadCount > 0 ? 'animate-bounce-subtle' : ''}/>
             {unreadCount > 0 && (
-              <span className="absolute 0 top-0 right-0 lg:-top-1 lg:-right-1 min-w-[18px] h-[18px] bg-primary rounded-full border-2 border-[#0b1120] text-[10px] font-black text-white flex items-center justify-center px-1 shadow-[0_0_10px_rgba(var(--primary),0.5)]">
+              <span className="absolute 0 top-0 right-0 lg:-top-1 lg:-right-1 min-w-[18px] h-[18px] bg-primary rounded-full border-2 border-background text-[10px] font-black text-primary-content flex items-center justify-center px-1 shadow-[0_0_10px_rgba(var(--primary),0.5)]">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}

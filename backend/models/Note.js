@@ -27,7 +27,11 @@ const NoteSchema = new mongoose.Schema({
   lastEditedAt: { 
     type: Date, 
     default: Date.now 
-  }
+  },
+  flashcards: [{
+    question: { type: String, default: '' },
+    answer: { type: String, default: '' }
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model("Note", NoteSchema);

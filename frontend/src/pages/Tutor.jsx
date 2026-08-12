@@ -181,7 +181,7 @@ export default function Tutor() {
             <PremiumButton key={tab} strength={0.2}>
               <button
                 onClick={() => setRole(tab)}
-                className={`relative px-6 py-2 rounded-full text-sm font-semibold uppercase tracking-wider z-10 transition-colors ${role === tab ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`relative px-6 py-2 rounded-full text-sm font-semibold uppercase tracking-wider z-10 transition-colors ${role === tab ? 'text-primary-content' : 'text-gray-400 hover:text-white'}`}
               >
                  {role === tab && (
                    <motion.div
@@ -250,7 +250,7 @@ export default function Tutor() {
                             />
                         </div>
                         <PremiumButton>
-                            <button type="submit" disabled={!studentQuestion.trim()} className="bg-primary hover:bg-primary/80 disabled:opacity-50 text-white rounded-xl py-3 px-6 pb-[3px] h-[50px] font-bold transition-all shadow-[0_0_20px_rgba(var(--primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)]">
+                            <button type="submit" disabled={!studentQuestion.trim()} className="bg-primary hover:bg-primary/80 disabled:opacity-50 text-primary-content rounded-xl py-3 px-6 pb-[3px] h-[50px] font-bold transition-all shadow-[0_0_20px_rgba(var(--primary),0.2)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)]">
                                 Publish
                             </button>
                         </PremiumButton>
@@ -275,7 +275,7 @@ export default function Tutor() {
                               </p>
                               <button 
                                 onClick={() => requireAuth(() => {})}
-                                className="mt-4 px-8 py-2.5 bg-primary text-white rounded-xl font-bold hover:bg-primary/80 transition-all"
+                                className="mt-4 px-8 py-2.5 bg-primary text-primary-content rounded-xl font-bold hover:bg-primary/80 transition-all"
                               >
                                 Sign In / Register
                               </button>
@@ -398,7 +398,7 @@ export default function Tutor() {
                             <PremiumButton>
                                 <button 
                                     onClick={() => handleOpenSolve(prob)}
-                                    className="bg-accent/10 hover:bg-accent hover:text-white text-accent px-4 py-2 rounded-xl text-sm font-bold transition-all border border-accent/30"
+                                    className="bg-accent/10 hover:bg-accent hover:text-accent-content text-accent px-4 py-2 rounded-xl text-sm font-bold transition-all border border-accent/30"
                                 >
                                     Solve Problem
                                 </button>
@@ -422,7 +422,7 @@ export default function Tutor() {
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="bg-[#0f172a] border border-white/10 shadow-2xl rounded-2xl p-6 w-full max-w-xl"
+                            className="bg-surface border border-white/10 shadow-2xl rounded-2xl p-6 w-full max-w-xl"
                          >
                              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><Send size={20} className="text-accent"/> Distribute Solution</h3>
                              <p className="text-sm border-l-2 border-accent/50 pl-3 py-1 bg-surface text-gray-300 italic mb-4 rounded-r-md">"{activeProblem.questionText}"</p>
@@ -436,7 +436,7 @@ export default function Tutor() {
                                  ></textarea>
                                  <div className="flex justify-end gap-3 mt-6">
                                      <button type="button" onClick={() => setSolveModalOpen(false)} className="px-5 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors">Cancel</button>
-                                     <button type="submit" disabled={!solutionText.trim()} className="px-5 py-2 text-sm font-bold bg-accent hover:bg-accent/80 text-white rounded-xl disabled:opacity-50 transition-all">Submit Answer</button>
+                                     <button type="submit" disabled={!solutionText.trim()} className="px-5 py-2 text-sm font-bold bg-accent hover:bg-accent/80 text-accent-content rounded-xl disabled:opacity-50 transition-all">Submit Answer</button>
                                  </div>
                              </form>
                          </motion.div>

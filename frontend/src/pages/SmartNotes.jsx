@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sparkles, Wand2, Plus, Trash2, Download, Bold, Italic, Underline as UnderlineIcon,
@@ -209,6 +210,10 @@ const SmartNotes = () => {
            setNotes(prev => prev.map(n => n._id === activeNoteIdRef.current ? { ...n, summary: aiSummary } : n));
         }
       } catch (err) {
+        const errMsg = err.response?.data?.error || err.message || "";
+        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+          toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+        }
         console.error('Summarization failed', err);
       } finally {
         setAiLoading(false);
@@ -232,9 +237,27 @@ const SmartNotes = () => {
         const topicName = (title && title !== 'Untitled Note') ? title : 'General';
         const res = await generateFlashcards(html, topicName, activeNoteIdRef.current);
         setFcResult({ count: res.data.count, topicName });
+        
+        // Refresh active note to get the embedded flashcards
+        if (activeNoteIdRef.current) {
+          try {
+            const updated = await noteApi.fetchSingleNote(activeNoteIdRef.current);
+            if (updated.data?.note) {
+              setActiveNote(updated.data.note);
+              setNotes(prev => prev.map(n => n._id === updated.data.note._id ? updated.data.note : n));
+            }
+          } catch (e) {
+            console.error('Failed to refresh note after flashcard generation', e);
+          }
+        }
       } catch (err) {
+        const errMsg = err.response?.data?.error || err.message || "";
+        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+          toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+        } else {
+          alert('Failed to generate flashcards. Please try again.');
+        }
         console.error('Flashcard generation failed', err);
-        alert('Failed to generate flashcards. Please try again.');
       } finally {
         setFcLoading(false);
       }
@@ -266,9 +289,9 @@ const SmartNotes = () => {
     }
   };
 
-  const filteredNotes = notes.filter(n => 
-    n.title.toLowerCase().includes(search.toLowerCase()) ||
-    (n.content && n.content.toLowerCase().includes(search.toLowerCase()))
+  const filteredNotes = (notes || []).filter(n => 
+    n?.title?.toLowerCase().includes(search.toLowerCase()) ||
+    (n?.content && n.content.toLowerCase().includes(search.toLowerCase()))
   );
 
   return (
@@ -389,7 +412,7 @@ const SmartNotes = () => {
                   <button 
                     onClick={handleSummarize}
                     disabled={aiLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:opacity-90 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:opacity-90 rounded-xl text-sm font-semibold text-accent-content transition-all disabled:opacity-50"
                   >
                     <Sparkles size={16} className={aiLoading ? 'animate-spin' : ''} />
                     {aiLoading ? 'Summarizing...' : 'Summarize AI'}
@@ -434,6 +457,24 @@ const SmartNotes = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Embedded Flashcards UI */}
+              {activeNote?.flashcards && activeNote.flashcards.length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <BrainCircuit size={18} className="text-primary" />
+                    Embedded Flashcards
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {activeNote.flashcards.map((fc, idx) => (
+                      <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-xl relative group">
+                        <p className="font-semibold text-white mb-2"><span className="text-primary mr-2">Q:</span>{fc.question || 'Untitled Question'}</p>
+                        <p className="text-gray-400"><span className="text-emerald-400 mr-2">A:</span>{fc.answer || 'No answer provided'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -502,7 +543,7 @@ const SmartNotes = () => {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="relative bg-[#0d1117] border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
+            className="relative bg-surface border border-primary/30 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">

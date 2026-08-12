@@ -187,8 +187,8 @@ const ExpenseTracker = () => {
                       ))}
                     </Pie>
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
-                      itemStyle={{ color: '#fff' }}
+                      contentStyle={{ backgroundColor: 'rgb(var(--color-surface))', borderColor: 'rgb(var(--color-white) / 0.1)', borderRadius: '8px', color: 'rgb(var(--color-white))' }}
+                      itemStyle={{ color: 'rgb(var(--color-primary))', fontWeight: 'bold' }}
                     />
                     <Legend verticalAlign="bottom" height={36}/>
                   </RechartsPie>

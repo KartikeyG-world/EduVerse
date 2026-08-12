@@ -16,10 +16,12 @@ const generateInsight = async (userName, stats) => {
 The student, ${userName}, has accumulated ${stats.level} levels, a ${stats.streak} day streak, and focused for ${stats.focusHours.toFixed(1)} hours.
 Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep it under 2 sentences. Use emojis.`;
 
+    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
     const response = await axios.post(OPENROUTER_URL, 
       {
         model: "openai/gpt-3.5-turbo",
-        messages: [{ role: "system", content: prompt }]
+        messages: [{ role: "system", content: prompt }],
+        max_tokens: MAX_TOKENS
       },
       {
         headers: {

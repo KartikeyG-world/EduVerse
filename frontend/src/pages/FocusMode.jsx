@@ -118,7 +118,7 @@ const FocusMode = () => {
             className={`px-4 sm:px-6 py-2.5 rounded-xl md:rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 flex gap-2 items-center flex-1 justify-center min-w-[120px]
               ${isLearningSession ? 'opacity-40 cursor-not-allowed' : ''}
               ${timerType === key
-                ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg'
+                ? 'bg-gradient-to-r from-primary to-accent text-primary-content shadow-lg'
                 : 'text-gray-400 active:text-white md:hover:text-white'
               }`}
           >

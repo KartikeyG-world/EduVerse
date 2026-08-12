@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
+import toast from 'react-hot-toast';
 import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, Loader2, Plus, Menu, X, MessageSquare, Trash2, Edit2, Check, BrainCircuit } from 'lucide-react';
@@ -130,7 +131,13 @@ const Chatbot = () => {
         setSessions(prev => prev.map(s => s._id === activeSessionId ? { ...s, title: updatedSession.title, updatedAt: updatedSession.updatedAt } : s));
         
       } catch (err) {
-        setMessages([...newMessages, { role: 'assistant', content: "Sorry, I'm having trouble connecting to the server. Please try again." }]);
+        const errMsg = err.response?.data?.error || err.message || "";
+        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+          toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+          setMessages([...newMessages, { role: 'assistant', content: "AI features are temporarily unavailable. Please try again in a moment." }]);
+        } else {
+          setMessages([...newMessages, { role: 'assistant', content: "Sorry, I'm having trouble connecting to the server. Please try again." }]);
+        }
       } finally {
         setLoading(false);
         setTimeout(() => {
@@ -244,7 +251,7 @@ const Chatbot = () => {
           </button>
           <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center border border-primary/50 relative shadow-[0_0_15px_rgba(var(--primary),0.3)] shrink-0">
             <Bot size={20} />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-[#1e293b] rounded-full shadow-[0_0_8px_rgba(34,197,94,1)]"></span>
+            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-surface rounded-full shadow-[0_0_8px_rgba(34,197,94,1)]"></span>
           </div>
           <div>
             <h2 className="text-lg font-bold truncate max-w-[200px] sm:max-w-xs md:max-w-md">{activeSessionId ? sessions.find(s => s._id === activeSessionId)?.title || "EduVerse Tutor" : "EduVerse Tutor"}</h2>
@@ -266,12 +273,12 @@ const Chatbot = () => {
                   >
                     <div className={`max-w-[85%] sm:max-w-[80%] flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                       <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center shadow-lg
-                        ${msg.role === 'user' ? 'bg-gradient-to-tr from-accent to-primary text-white' : 'bg-surface border border-primary/30 text-primary'}`}
+                        ${msg.role === 'user' ? 'bg-gradient-to-tr from-accent to-primary text-white-fixed' : 'bg-surface border border-primary/30 text-primary'}`}
                       >
                         {msg.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                       </div>
                       <div className={`p-4 rounded-2xl shadow-xl backdrop-blur-md relative
-                        ${msg.role === 'user' ? 'bg-primary/90 text-white rounded-tr-sm' : 'glass border-white/10 text-gray-200 rounded-tl-sm'}`}
+                        ${msg.role === 'user' ? 'bg-primary/90 text-primary-content rounded-tr-sm' : 'glass border-white/10 text-gray-200 rounded-tl-sm'}`}
                       >
                         <p className="leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
                       </div>
@@ -315,7 +322,7 @@ const Chatbot = () => {
                   whileHover={!loading && input.trim() ? { scale: 1.02 } : {}}
                   whileTap={!loading && input.trim() ? { scale: 0.96 } : {}}
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white disabled:opacity-50 transition-colors shadow-lg"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-content disabled:opacity-50 transition-colors shadow-lg"
                 >
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} className="ml-0.5" />}
                 </motion.button>
@@ -332,7 +339,7 @@ const Chatbot = () => {
             <p className="text-gray-400 max-w-md mb-8">Ask anything. Learn everything. Your EduVerse AI tutor is ready to help you master any subject.</p>
             <button 
               onClick={createNewSession}
-              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-medium rounded-xl py-3 px-8 transition-all transform hover:scale-[1.02] flex items-center gap-2 shadow-lg shadow-primary/20"
+              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-content font-medium rounded-xl py-3 px-8 transition-all transform hover:scale-[1.02] flex items-center gap-2 shadow-lg shadow-primary/20"
             >
               <Plus size={18} /> New Chat
             </button>

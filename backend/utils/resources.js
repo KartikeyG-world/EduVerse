@@ -82,8 +82,10 @@ const fetchWikipediaArticle = async (query) => {
         list: 'search',
         srsearch: query,
         srlimit: 1,
-        format: 'json',
-        origin: '*'
+        format: 'json'
+      },
+      headers: {
+        'User-Agent': 'EduVerse/1.0 (https://github.com/EduVerse; eduversetgw@gmail.com) axios'
       },
       timeout: 5000
     });

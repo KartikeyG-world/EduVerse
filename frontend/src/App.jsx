@@ -29,19 +29,21 @@ import FlashcardStudy from './pages/FlashcardStudy'; // Phase 2: SRS
 import { CompanionProvider } from './context/CompanionContext';
 import { FocusProvider } from './context/FocusContext';
 import AuthModal from './components/ui/AuthModal';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthContext } from './context/AuthContext';
 import { useContext } from 'react';
 
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ToastProvider>
-          <CompanionProvider>
-            <FocusProvider>
-              <InteractionProvider>
-                <ClickImpact />
-                <AuthModal />
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <CompanionProvider>
+              <FocusProvider>
+                <InteractionProvider>
+                  <ClickImpact />
+                  <AuthModal />
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
@@ -74,6 +76,7 @@ function App() {
           </CompanionProvider>
         </ToastProvider>
       </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import { motion } from 'framer-motion';
 import { User, Lock, Mail, ArrowRight, Eye, EyeOff, Check, X, Smartphone } from 'lucide-react';
 import { useToast } from '../../components/ui/ToastProvider';
+import SocialAuthButtons from '../../components/auth/SocialAuthButtons';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -157,13 +158,15 @@ const Register = () => {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] mt-4 flex items-center justify-center gap-2 group disabled:opacity-50"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-content font-bold rounded-2xl py-4 transition-all shadow-[0_8px_30px_rgb(var(--primary),0.2)] mt-4 flex items-center justify-center gap-2 group disabled:opacity-50"
           >
             {loading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : <>Create Account <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform"/></>}
           </button>
         </form>
+
+        <SocialAuthButtons actionText="WITH SOCIAL" />
         
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
+        <div className="mt-6 pt-6 border-t border-white/5 text-center">
           <p className="text-gray-400 text-sm">
             Already have an account? <Link to="/login" className="text-primary font-bold hover:underline">Log In</Link>
           </p>
