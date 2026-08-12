@@ -7,27 +7,44 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
+// Robust check: Validate that critical environment variables exist
+if (!process.env.MONGO_URI) {
+  console.error("CRITICAL ERROR: MONGO_URI is not set in environment variables!");
+  process.exit(1);
+}
+if (!process.env.JWT_SECRET) {
+  console.error("CRITICAL ERROR: JWT_SECRET is not set in environment variables!");
+  process.exit(1);
+}
+
 const app = express();
+
+// Disable command buffering globally so database outages fail immediately instead of hanging requests
+mongoose.set("bufferCommands", false);
 
 // Middleware
 // app.use(helmet()); // Temporarily disabled to resolve connectivity issues
 app.use(express.json());
 
 // CORS — allow Vercel frontend + localhost for development
+// Normalized: Remove any trailing slashes to prevent mismatches
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:5173",
   "http://localhost:3000"
-].filter(Boolean);
+].filter(Boolean).map(url => url.replace(/\/+$/, ""));
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, health checks)
     if (!origin) return callback(null, true);
     
+    // Normalize incoming origin by removing trailing slashes
+    const normalizedOrigin = origin.replace(/\/+$/, "");
+    
     // Dynamically allow any localhost port in development to prevent CORS issues if port 5173 is occupied
-    const isLocalhost = /^http:\/\/localhost(:\d+)?$/.test(origin);
-    if (isLocalhost || allowedOrigins.includes(origin)) {
+    const isLocalhost = /^http:\/\/localhost(:\d+)?$/.test(normalizedOrigin);
+    if (isLocalhost || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
     return callback(null, false);
@@ -72,7 +89,9 @@ app.listen(PORT, "0.0.0.0", () => {
   
   // Connect to MongoDB Atlas in the background
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+    })
     .then(() => console.log("Connected to MongoDB Atlas"))
     .catch((err) => {
       console.error("MongoDB connection error:", err);
