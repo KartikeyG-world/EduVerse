@@ -210,9 +210,11 @@ const SmartNotes = () => {
            setNotes(prev => prev.map(n => n._id === activeNoteIdRef.current ? { ...n, summary: aiSummary } : n));
         }
       } catch (err) {
-        const errMsg = err.response?.data?.error || err.message || "";
-        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+        const backendMsg = err.response?.data?.message || err.response?.data?.error || err.message || "";
+        if (backendMsg.includes('AI_CREDIT_LIMIT') || backendMsg.includes('AI_RATE_LIMIT')) {
           toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+        } else {
+          toast.error("Summarization failed. Please try again.");
         }
         console.error('Summarization failed', err);
       } finally {
@@ -251,11 +253,11 @@ const SmartNotes = () => {
           }
         }
       } catch (err) {
-        const errMsg = err.response?.data?.error || err.message || "";
-        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+        const backendMsg = err.response?.data?.message || err.response?.data?.error || err.message || "";
+        if (backendMsg.includes('AI_CREDIT_LIMIT') || backendMsg.includes('AI_RATE_LIMIT')) {
           toast.error("AI features are temporarily unavailable. Please try again in a moment.");
         } else {
-          alert('Failed to generate flashcards. Please try again.');
+          toast.error("Flashcard generation failed. Please try again.");
         }
         console.error('Flashcard generation failed', err);
       } finally {

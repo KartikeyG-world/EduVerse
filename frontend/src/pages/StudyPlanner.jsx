@@ -97,11 +97,11 @@ const StudyPlanner = () => {
           setPlan(res.data.roadmap);
           fetchSavedPlans();
         } catch (err) {
-          const errMsg = err.response?.data?.error || err.message || "";
-          if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+          const backendMsg = err.response?.data?.message || err.response?.data?.error || err.message || "";
+          if (backendMsg.includes('AI_CREDIT_LIMIT') || backendMsg.includes('AI_RATE_LIMIT')) {
             toast.error("AI features are temporarily unavailable. Please try again in a moment.");
           } else {
-            alert("Failed to generate plan. Please check your OpenAI billing quota.");
+            toast.error("Failed to generate plan. Please try again.");
           }
           console.error(err);
         } finally {

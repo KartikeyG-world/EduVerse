@@ -131,11 +131,12 @@ const Chatbot = () => {
         setSessions(prev => prev.map(s => s._id === activeSessionId ? { ...s, title: updatedSession.title, updatedAt: updatedSession.updatedAt } : s));
         
       } catch (err) {
-        const errMsg = err.response?.data?.error || err.message || "";
-        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+        const backendMsg = err.response?.data?.message || err.response?.data?.error || err.message || "";
+        if (backendMsg.includes('AI_CREDIT_LIMIT') || backendMsg.includes('AI_RATE_LIMIT')) {
           toast.error("AI features are temporarily unavailable. Please try again in a moment.");
-          setMessages([...newMessages, { role: 'assistant', content: "AI features are temporarily unavailable. Please try again in a moment." }]);
+          setMessages([...newMessages, { role: 'assistant', content: "⚠️ AI features are temporarily unavailable. Please try again in a moment." }]);
         } else {
+          toast.error("Failed to send message. Please try again.");
           setMessages([...newMessages, { role: 'assistant', content: "Sorry, I'm having trouble connecting to the server. Please try again." }]);
         }
       } finally {

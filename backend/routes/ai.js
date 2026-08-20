@@ -12,7 +12,8 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // Helper for making OpenRouter API calls
 const openRouterCall = async (messages) => {
   try {
-    const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
+    // Defensive: cap token limits to 1500 to avoid pre-flight credit check failures (402)
+    const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1500, 1500);
     const response = await axios.post(
       OPENROUTER_URL,
       {
@@ -162,7 +163,7 @@ Respond ONLY with valid JSON in this exact structure:
     res.json(savedPlan);
   } catch (err) {
     console.error("AI Planner error:", err);
-    res.status(500).json({ error: "Failed to generate study plan" });
+    res.status(500).json({ error: "Failed to generate study plan", message: err.message });
   }
 });
 
@@ -200,6 +201,10 @@ router.post("/summarize", protect, async (req, res) => {
   try {
     const { content } = req.body;
 
+    if (!content || typeof content !== 'string' || content.trim().length < 10) {
+      return res.status(400).json({ error: "Content is too short to summarize" });
+    }
+
     const messages = [
       {
         role: "system",
@@ -219,7 +224,7 @@ router.post("/summarize", protect, async (req, res) => {
     res.json({ summary: summaryText });
   } catch (err) {
     console.error("AI Summarizer error:", err);
-    res.status(500).json({ error: "Failed to summarize notes" });
+    res.status(500).json({ error: "Failed to summarize notes", message: err.message });
   }
 });
 
@@ -227,6 +232,10 @@ router.post("/summarize", protect, async (req, res) => {
 router.post("/chat", protect, async (req, res) => {
   try {
     const { message, history, isSystemMessage } = req.body;
+
+    if (!isSystemMessage && (!message || typeof message !== 'string' || message.trim().length === 0)) {
+      return res.status(400).json({ error: "Message content cannot be empty" });
+    }
 
     // Save user message
     if (!isSystemMessage) {
@@ -272,7 +281,7 @@ router.post("/chat", protect, async (req, res) => {
     res.json({ reply: replyText });
   } catch (err) {
     console.error("AI Chatbot error:", err);
-    res.status(500).json({ error: "Failed to get chatbot response" });
+    res.status(500).json({ error: "Failed to get chatbot response", message: err.message });
   }
 });
 

@@ -12,7 +12,8 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 /** Shared OpenRouter call (mirrors ai.js helper, but kept separate to avoid coupling) */
 const callAI = async (messages) => {
-  const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS) || 1500;
+  // Defensive: cap token limits to 1500 to avoid pre-flight credit check failures (402)
+  const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1500, 1500);
   const response = await axios.post(
     OPENROUTER_URL,
     { model: 'openai/gpt-3.5-turbo', messages, max_tokens: MAX_TOKENS },
@@ -30,10 +31,22 @@ const callAI = async (messages) => {
   return content;
 };
 
-/** Strip markdown code fences and parse JSON safely */
+/** Strip markdown code fences and parse JSON safely, falling back to regex array extraction */
 const safeParseJSON = (text) => {
-  const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-  return JSON.parse(cleaned);
+  try {
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (err) {
+    const match = text.match(/\[[\s\S]*\]/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch (_) {
+        // Fall back to original error
+      }
+    }
+    throw err;
+  }
 };
 
 /**
