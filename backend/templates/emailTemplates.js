@@ -212,3 +212,22 @@ exports.getWelcomeEmailTemplate = (userName, dashboardUrl) => {
   `;
   return getBaseLayout(`Welcome to EduVerse AI, ${userName}!`, content);
 };
+
+/**
+ * Password Reset Email Template
+ */
+exports.getPasswordResetEmailTemplate = (userName, resetLink) => {
+  const content = `
+    <h2>Password Reset Request</h2>
+    <p>Hi ${userName || 'there'},</p>
+    <p>We received a request to reset your password for your <strong>EduVerse AI</strong> account. Click the button below to choose a new password:</p>
+    
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${resetLink}" class="cta-btn">Reset Your Password</a>
+      <div style="margin-top: 12px;"><span class="expire-tag">⏱ Link expires in 15 minutes</span></div>
+    </div>
+    
+    <p style="font-size: 13px; color: #94A3B8;">If you did not request a password reset, please ignore this email or contact support if you suspect unauthorized access. Your password will remain unchanged.</p>
+  `;
+  return getBaseLayout("EduVerse AI — Password Reset Request", content);
+};

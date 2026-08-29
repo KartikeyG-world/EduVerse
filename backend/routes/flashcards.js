@@ -6,30 +6,12 @@ const TopicMastery = require('../models/TopicMastery');
 const { protect } = require('../middlewares/auth');
 const { updateTopicMastery } = require('../utils/mastery');
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const { generateAICompletion } = require('../services/aiGateway');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Shared OpenRouter call (mirrors ai.js helper, but kept separate to avoid coupling) */
-const callAI = async (messages) => {
-  // Defensive: cap token limits to 1500 to avoid pre-flight credit check failures (402)
-  const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1500, 1500);
-  const response = await axios.post(
-    OPENROUTER_URL,
-    { model: 'openai/gpt-3.5-turbo', messages, max_tokens: MAX_TOKENS },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:5000',
-        'X-OpenRouter-Title': 'EduVerse AI Flashcards',
-      },
-    }
-  );
-  const content = response.data?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Empty AI response');
-  return content;
-};
+/** Shared AI call via unified AI Gateway */
+const callAI = (messages) => generateAICompletion({ messages, maxTokens: 1500 });
 
 /** Strip markdown code fences and parse JSON safely, falling back to regex array extraction */
 const safeParseJSON = (text) => {
@@ -173,8 +155,17 @@ router.get('/', protect, async (req, res) => {
       filter.nextReviewDate = { $lte: new Date() };
     }
 
-    const cards = await Flashcard.find(filter).sort({ nextReviewDate: 1 });
-    res.json({ success: true, flashcards: cards, count: cards.length });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const skip = (page - 1) * limit;
+
+    const cards = await Flashcard.find(filter)
+      .sort({ nextReviewDate: 1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+      
+    res.json({ success: true, flashcards: cards, count: cards.length, page, limit });
   } catch (err) {
     console.error('[Flashcard GET Error]', err.message);
     res.status(500).json({ success: false, message: 'Failed to fetch flashcards.' });

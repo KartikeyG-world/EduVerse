@@ -1,36 +1,93 @@
-const updateStreak = async (user) => {
-  if (!user) return null;
+/**
+ * Helper to compute local date in YYYY-MM-DD format using IANA timezone or numeric offset.
+ * Falls back safely to UTC if timezone is missing, invalid, or malformed.
+ */
+const getLocalDateString = (date = new Date(), timezone = null) => {
+  if (!date || isNaN(new Date(date).getTime())) {
+    date = new Date();
+  } else if (!(date instanceof Date)) {
+    date = new Date(date);
+  }
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  let isUpdated = false;
-
-  if (!user.lastActiveDate) {
-    user.lastActiveDate = new Date();
-    user.streak = 1;
-    isUpdated = true;
-  } else {
-    const lastActiveStr = user.lastActiveDate.toISOString().split('T')[0];
-
-    if (todayStr !== lastActiveStr) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-      if (lastActiveStr === yesterdayStr) {
-        user.streak += 1;
-      } else {
-        user.streak = 1;
-      }
-      user.lastActiveDate = new Date();
-      isUpdated = true;
+  // 1. Try IANA Timezone string (e.g. 'Asia/Kolkata', 'America/New_York')
+  if (timezone && typeof timezone === 'string') {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      return formatter.format(date); // Returns 'YYYY-MM-DD'
+    } catch (_) {
+      // Fall through to offset / UTC fallback
     }
   }
 
-  if (isUpdated) {
+  // 2. Try numeric offset in minutes (e.g. -330 for IST from getTimezoneOffset())
+  if (typeof timezone === 'number' && !isNaN(timezone)) {
+    const localTime = new Date(date.getTime() - timezone * 60 * 1000);
+    return localTime.toISOString().split('T')[0];
+  }
+
+  // 3. Fallback to UTC
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Calculates calendar day difference between two YYYY-MM-DD date strings
+ */
+const getDayDifference = (dateStr1, dateStr2) => {
+  const d1 = new Date(`${dateStr1}T00:00:00Z`);
+  const d2 = new Date(`${dateStr2}T00:00:00Z`);
+  const diffMs = d2.getTime() - d1.getTime();
+  return Math.round(diffMs / (24 * 60 * 60 * 1000));
+};
+
+/**
+ * Timezone-aware streak updater.
+ * Evaluates day boundaries in user's local timezone.
+ */
+const updateStreak = async (user, timezone = null) => {
+  if (!user) return null;
+
+  const now = new Date();
+  const todayLocalStr = getLocalDateString(now, timezone);
+  let isUpdated = false;
+
+  if (!user.lastActiveDate) {
+    user.lastActiveDate = now;
+    user.streak = 1;
+    isUpdated = true;
+  } else {
+    const lastActiveLocalStr = getLocalDateString(user.lastActiveDate, timezone);
+    const dayDiff = getDayDifference(lastActiveLocalStr, todayLocalStr);
+
+    if (dayDiff === 1) {
+      // Consecutive calendar day in user's timezone
+      user.streak = (user.streak || 0) + 1;
+      user.lastActiveDate = now;
+      isUpdated = true;
+    } else if (dayDiff > 1) {
+      // Streak broken
+      user.streak = 1;
+      user.lastActiveDate = now;
+      isUpdated = true;
+    } else if (dayDiff === 0) {
+      // Same calendar day — maintain current streak
+      user.lastActiveDate = now;
+    }
+  }
+
+  if (isUpdated && typeof user.save === 'function') {
     await user.save();
   }
 
   return user;
 };
 
-module.exports = { updateStreak };
+module.exports = {
+  updateStreak,
+  getLocalDateString,
+  getDayDifference
+};

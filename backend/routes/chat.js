@@ -2,46 +2,9 @@ const express = require("express");
 const router = express.Router();
 const ChatSession = require("../models/ChatSession");
 const { protect } = require("../middlewares/auth");
-const axios = require("axios");
+const { generateAICompletion } = require("../services/aiGateway");
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-
-const openRouterCall = async (messages) => {
-  try {
-    // Defensive: cap token limits to 1500 to avoid pre-flight credit check failures (402)
-    const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1500, 1500);
-    const response = await axios.post(
-      OPENROUTER_URL,
-      {
-        model: "openai/gpt-3.5-turbo",
-        messages: messages,
-        max_tokens: MAX_TOKENS
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "http://localhost:5000",
-          "X-OpenRouter-Title": "EduVerse AI"
-        }
-      }
-    );
-
-    const data = response.data;
-    if (!data?.choices?.[0]?.message?.content) {
-      throw new Error("Invalid response format from OpenRouter");
-    }
-
-    return data.choices[0].message.content;
-  } catch (error) {
-    const status = error?.response?.status;
-    const msg = error?.response?.data?.error?.message || error.message;
-
-    if (status === 402) throw new Error('AI_CREDIT_LIMIT: AI unavailable. Try again shortly.');
-    if (status === 429) throw new Error('AI_RATE_LIMIT: Too many requests. Wait and retry.');
-    throw new Error(msg);
-  }
-};
+const openRouterCall = (messages) => generateAICompletion({ messages, maxTokens: 1500 });
 
 // Create a new empty chat session
 router.post("/sessions", protect, async (req, res) => {
@@ -53,8 +16,8 @@ router.post("/sessions", protect, async (req, res) => {
     });
     res.json(session);
   } catch (err) {
-    console.error("CREATE SESSION ERROR:", err);
-    res.status(500).json({ error: "Failed to create session", message: err.message });
+    console.error("[Chat Create Session Error]:", err);
+    res.status(500).json({ error: "Failed to create session", message: "Failed to create session. Please try again." });
   }
 });
 
@@ -66,7 +29,8 @@ router.get("/sessions", protect, async (req, res) => {
       .sort({ updatedAt: -1 });
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch sessions", message: err.message });
+    console.error("[Chat Fetch Sessions Error]:", err);
+    res.status(500).json({ error: "Failed to fetch sessions", message: "Failed to fetch sessions. Please try again." });
   }
 });
 
@@ -80,6 +44,7 @@ router.get("/sessions/:sessionId", protect, async (req, res) => {
     }
     res.json(session);
   } catch (err) {
+    console.error("[Chat Fetch Session Error]:", err);
     res.status(500).json({ error: "Failed to fetch session" });
   }
 });
@@ -105,7 +70,9 @@ router.post("/sessions/:sessionId/message", protect, async (req, res) => {
       }
     ];
 
-    session.messages.forEach(h => {
+    // FIX 7: Slice only the last 10 messages to avoid LLM context overflow
+    const recentHistory = session.messages.slice(-10);
+    recentHistory.forEach(h => {
       messagesPayload.push({
         role: h.role === "user" ? "user" : "assistant",
         content: h.content
@@ -128,7 +95,8 @@ router.post("/sessions/:sessionId/message", protect, async (req, res) => {
 
     res.json({ reply: replyText, session });
   } catch (err) {
-    res.status(500).json({ error: "Failed to process message", message: err.message });
+    console.error("[Chat Process Message Error]:", err);
+    res.status(500).json({ error: "Failed to process message", message: "Failed to process message. Please try again." });
   }
 });
 

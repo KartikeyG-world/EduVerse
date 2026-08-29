@@ -39,15 +39,22 @@ router.get('/my-problems', optionalAuth, async (req, res) => {
   try {
     if (!req.user) return res.json([]);
 
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
     const problems = await Problem.find({ userId: req.user.id })
       .populate({
         path: 'solutions',
         populate: {
           path: 'teacherId',
-          select: 'name xp level'
+          select: 'name xp level avatar'
         }
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
     
     res.json(problems);
   } catch (err) {
@@ -78,6 +85,11 @@ router.post('/accept', protect, async (req, res) => {
     const solution = await Solution.findById(solutionId);
     if (!solution) {
       return res.status(404).json({ message: 'Solution not found' });
+    }
+
+    // Guard: Prevent self-rewarding XP and tutor points
+    if (solution.teacherId.toString() === req.user.id) {
+      return res.status(400).json({ success: false, message: 'You cannot accept your own solution.' });
     }
 
     // Update Problem
@@ -154,6 +166,11 @@ router.post('/solution', protect, async (req, res) => {
         return res.status(400).json({ message: 'This problem is already solved' });
     }
 
+    // Guard: Prevent users from submitting solutions to their own problem
+    if (problem.userId.toString() === req.user.id) {
+      return res.status(400).json({ success: false, message: 'You cannot submit a solution to your own problem.' });
+    }
+
     const solution = await Solution.create({
       problemId,
       teacherId: req.user.id,
@@ -188,13 +205,11 @@ router.get('/stats', optionalAuth, async (req, res) => {
     const totalPosted = await Problem.countDocuments({ userId });
     
     // 2. Total Problems Solved (Solutions accepted by students where this user is teacher)
-    const solutionsByMe = await Solution.find({ teacherId: userId });
-    const solutionIds = solutionsByMe.map(s => s._id);
+    const solutionIds = await Solution.find({ teacherId: userId }).distinct('_id');
     const totalSolved = await Problem.countDocuments({ acceptedSolution: { $in: solutionIds } });
     
     // 3. Total Points
-    const user = await User.findById(userId);
-    const totalPoints = user.tutorPoints || 0;
+    const totalPoints = req.user.tutorPoints || 0;
     
     res.json({
        totalPosted,

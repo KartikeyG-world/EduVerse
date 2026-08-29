@@ -3,18 +3,33 @@ const router = express.Router();
 const yts = require('yt-search');
 const axios = require('axios');
 const { protect, optionalAuth } = require('../middlewares/auth');
+const { generateAICompletion } = require('../services/aiGateway');
 
-// Simple in-memory cache — expires after 10 minutes
+// Bounded in-memory cache with LRU eviction (max 500 items, TTL: 10 minutes)
 const cache = new Map();
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
 
 const getCached = (key) => {
   const entry = cache.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.ts > CACHE_TTL_MS) { cache.delete(key); return null; }
+  if (Date.now() - entry.ts > CACHE_TTL_MS) { 
+    cache.delete(key); 
+    return null; 
+  }
+  // Refresh recency on read
+  cache.delete(key);
+  cache.set(key, entry);
   return entry.data;
 };
-const setCache = (key, data) => cache.set(key, { data, ts: Date.now() });
+
+const setCache = (key, data) => {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+  }
+  cache.set(key, { data, ts: Date.now() });
+};
 
 // @route  GET /api/discover?q=...
 // @desc   Search YouTube + AI-filter for best learning resources
@@ -89,24 +104,14 @@ Respond ONLY with a valid JSON array, no extra text:
 
     let aiFiltered = [];
     try {
-      const aiRes = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-          model: 'google/gemini-flash-1.5',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 512,
-          temperature: 0.2,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 15000,
-        }
-      );
+      const rawReply = await generateAICompletion({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'google/gemini-flash-1.5',
+        maxTokens: 512,
+        temperature: 0.2,
+        timeoutMs: 15000
+      });
 
-      const rawReply = aiRes.data.choices?.[0]?.message?.content || '';
       const jsonMatch = rawReply.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);

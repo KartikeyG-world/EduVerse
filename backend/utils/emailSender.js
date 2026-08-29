@@ -1,4 +1,4 @@
-const { getOtpEmailTemplate, getWelcomeEmailTemplate } = require('../templates/emailTemplates');
+const { getOtpEmailTemplate, getWelcomeEmailTemplate, getPasswordResetEmailTemplate } = require('../templates/emailTemplates');
 
 /**
  * Send Brevo HTTP API Email
@@ -62,7 +62,17 @@ const sendWelcomeEmail = async (toEmail, userName) => {
   return sendBrevoEmail(toEmail, `Welcome to EduVerse AI, ${userName}! 🚀`, htmlContent);
 };
 
+/**
+ * Send Password Reset Email (FIX 4)
+ */
+const sendPasswordResetEmail = async (toEmail, resetLink, userName) => {
+  const htmlContent = getPasswordResetEmailTemplate(userName, resetLink);
+  return sendBrevoEmail(toEmail, "Reset Your EduVerse AI Password", htmlContent);
+};
+
 module.exports = {
+  sendBrevoEmail,
   sendOtpEmail,
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendPasswordResetEmail
 };

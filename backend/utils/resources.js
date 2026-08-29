@@ -1,8 +1,9 @@
 const axios = require('axios');
 
-// ─── In-memory cache (TTL: 24 hours) ──────────────────────────────────────────
+// ─── Bounded in-memory cache with LRU eviction (max 500 entries, TTL: 24 hours) ─
 const cache = new Map();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
 
 const getCached = (key) => {
   const entry = cache.get(key);
@@ -11,10 +12,17 @@ const getCached = (key) => {
     cache.delete(key);
     return null;
   }
+  // Refresh LRU order on access
+  cache.delete(key);
+  cache.set(key, entry);
   return entry.value;
 };
 
 const setCache = (key, value) => {
+  if (cache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    cache.delete(oldestKey);
+  }
   cache.set(key, { value, timestamp: Date.now() });
 };
 
@@ -140,11 +148,14 @@ const getTrustedArticle = (topic) => {
  * @param {string} topic - The study topic (e.g. "Arrays and Linked Lists")
  * @param {string} subject - The parent subject (e.g. "Java DSA") for context
  */
-const fetchResourcesForTopic = async (topic, subject = '') => {
+const fetchResourcesForTopic = async (topic, subject = '', fetchFullVideos = true) => {
   const searchQuery = `${subject} ${topic} tutorial`.trim();
 
   const [youtubeVideos, wikiArticle] = await Promise.all([
-    fetchYouTubeVideos(searchQuery, 2),
+    fetchFullVideos ? fetchYouTubeVideos(searchQuery, 2) : Promise.resolve([{
+      title: `${topic} - YouTube Search`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`
+    }]),
     fetchWikipediaArticle(topic)
   ]);
 
