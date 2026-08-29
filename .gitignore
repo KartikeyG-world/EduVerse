@@ -143,3 +143,5 @@ vite.config.ts.timestamp-*
 node_modules
 dist
 .env
+backend/docs/OPERATIONAL_GUIDE_QUIZ.md
+CHANGELOG_QUIZ_SYSTEM.md
