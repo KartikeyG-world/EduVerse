@@ -8,32 +8,9 @@ import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import PremiumButton from '../components/ui/PremiumButton';
 import ParallaxLayer from '../components/ui/ParallaxLayer';
 
+import AnimatedCounter from '../components/ui/AnimatedCounter';
+
 const SUBJECTS = ['Maths', 'Physics', 'Chemistry', 'Programming', 'Other'];
-
-// Animated Counter Component
-const AnimatedCounter = ({ end, duration = 2000 }) => {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let startTime = null;
-    const animate = (currentTime) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      
-      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setCount(Math.floor(easeProgress * end));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        if(end % 1 !== 0) setCount(end);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [end, duration]);
-
-  return <>{end % 1 !== 0 ? count.toFixed(1) : count}</>;
-};
 
 export default function Tutor() {
   const [role, setRole] = useState('student');
@@ -109,8 +86,7 @@ export default function Tutor() {
           await api.post('/tutor/problem', { subject: studentSubject, questionText: studentQuestion });
           setStudentQuestion('');
           triggerFeedback({ type: COMPANION_EVENTS.QUESTION_POSTED });
-          fetchMyProblems();
-          fetchStats();
+          Promise.allSettled([fetchMyProblems(), fetchStats()]);
         } catch(err) {
           triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Error posting question" } });
         }
@@ -155,8 +131,7 @@ export default function Tutor() {
               triggerFeedback({ type: COMPANION_EVENTS.SOLUTION_SUBMITTED });
               setSolveModalOpen(false);
               setActiveProblem(null);
-              fetchTeacherProblems(); 
-              fetchStats();
+              Promise.allSettled([fetchTeacherProblems(), fetchStats()]);
           } catch (err) {
               triggerFeedback({ type: COMPANION_EVENTS.ACTION_ERROR, data: { message: "Error submitting solution" } });
           }

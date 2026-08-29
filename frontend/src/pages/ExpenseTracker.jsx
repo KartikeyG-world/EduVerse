@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import toast from 'react-hot-toast';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
 import { motion } from 'framer-motion';
@@ -40,8 +41,9 @@ const ExpenseTracker = () => {
           setExpenses([res.data, ...expenses]);
           setAmount('');
           setDescription('');
+          toast.success("Expense added successfully!");
         } catch (err) {
-          alert("Failed to add expense.");
+          toast.error(err.response?.data?.message || "Failed to add expense.");
         } finally {
           setLoading(false);
         }
@@ -53,8 +55,9 @@ const ExpenseTracker = () => {
         try {
           await api.delete(`/expenses/${id}`);
           setExpenses(expenses.filter(e => e._id !== id));
+          toast.success("Expense deleted.");
         } catch (err) {
-          alert("Failed to delete expense.");
+          toast.error("Failed to delete expense.");
         }
     });
   };

@@ -62,24 +62,53 @@ const Chatbot = () => {
     });
   };
 
-  const deleteSession = async (e, sessionId) => {
+  const deleteSession = (e, sessionId) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this chat?")) return;
-    try {
-      await api.delete(`/chat/sessions/${sessionId}`);
-      const updated = sessions.filter(s => s._id !== sessionId);
-      setSessions(updated);
-      if (activeSessionId === sessionId) {
-        if (updated.length > 0) {
-          loadSession(updated[0]._id);
-        } else {
-          setActiveSessionId(null);
-          setMessages([]);
-        }
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium text-white">Delete this chat?</span>
+        <div className="flex justify-end gap-2 mt-1">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs text-gray-400 hover:text-white rounded-lg bg-surface/80 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                await api.delete(`/chat/sessions/${sessionId}`);
+                const updated = sessions.filter(s => s._id !== sessionId);
+                setSessions(updated);
+                if (activeSessionId === sessionId) {
+                  if (updated.length > 0) {
+                    loadSession(updated[0]._id);
+                  } else {
+                    setActiveSessionId(null);
+                    setMessages([]);
+                  }
+                }
+                toast.success("Chat deleted");
+              } catch (err) {
+                console.error('Failed to delete session', err);
+                toast.error("Failed to delete chat");
+              }
+            }}
+            className="px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      style: {
+        background: '#18181b',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#fff',
       }
-    } catch (err) {
-      console.error('Failed to delete session', err);
-    }
+    });
   };
 
   const startRename = (e, session) => {

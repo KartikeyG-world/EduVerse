@@ -17,22 +17,28 @@ const Analytics = () => {
     if (!isAuthenticated) return; // guests see zero-state, no API call
     const fetchStats = async () => {
       try {
-        const [statsRes, historyRes, weakRes, masteredRes] = await Promise.all([
+        const results = await Promise.allSettled([
           api.get('/users/me'),
           api.get('/focus/history'),
           api.get('/mastery/weak'),
           api.get('/mastery/all')
         ]);
         
-        setStats(statsRes.data);
+        if (results[0].status === 'fulfilled') {
+          setStats(results[0].value.data);
+        }
+
+        const weakData = results[2].status === 'fulfilled' ? results[2].value.data : [];
+        const allMastery = results[3].status === 'fulfilled' ? results[3].value.data : [];
+
         setMasteryStats({
-          weak: weakRes.data,
-          mastered: masteredRes.data.filter(t => t.masteryScore >= 80)
+          weak: weakData,
+          mastered: Array.isArray(allMastery) ? allMastery.filter(t => t.masteryScore >= 80) : []
         });
         
         // Process real history data for the chart
-        if (historyRes.data.success) {
-          const sessions = historyRes.data.sessions;
+        if (results[1].status === 'fulfilled' && results[1].value.data?.success) {
+          const sessions = results[1].value.data.sessions;
           const chartData = [];
           
           for(let i=6; i>=0; i--) {

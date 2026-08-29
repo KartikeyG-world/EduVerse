@@ -18,33 +18,7 @@ import ScrollReveal, { ScrollRevealGroup } from '../components/ui/ScrollReveal';
 import PremiumButton from '../components/ui/PremiumButton';
 import ParallaxLayer from '../components/ui/ParallaxLayer';
 import MasteryOverview from '../components/dashboard/MasteryOverview';
-
-// Animated Counter Component replacing previous custom hook to obey rules
-const AnimatedCounter = ({ end, duration = 2000 }) => {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let startTime = null;
-    const animate = (currentTime) => {
-      if (!startTime) startTime = currentTime;
-      const progress = Math.min((currentTime - startTime) / duration, 1);
-      
-      // easeOutExpo
-      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      setCount(Math.floor(easeProgress * end));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Fallback for decimals
-        if(end % 1 !== 0) setCount(end);
-      }
-    };
-    requestAnimationFrame(animate);
-  }, [end, duration]);
-
-  return <>{end % 1 !== 0 ? count.toFixed(1) : count}</>;
-};
+import AnimatedCounter from '../components/ui/AnimatedCounter';
 
 // Animated Typewriter component for AI insights
 const TypewriterText = ({ text }) => {
@@ -77,6 +51,7 @@ const Dashboard = () => {
   const { user, updateUser } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [chartReady, setChartReady] = useState(false);
   const [pendingCards, setPendingCards] = useState(null); // Phase 2: SRS
@@ -92,31 +67,44 @@ const Dashboard = () => {
   const fetchDashboard = async () => {
     try {
       setRefreshing(true);
-      const res = await api.get('/dashboard');
-      setData(res.data);
-      updateUser({ streak: res.data.stats.streak }); // Sync sidebar
-      triggerFeedback({ 
-        type: COMPANION_EVENTS.DASHBOARD_LOAD, 
-        data: { name: user?.name } 
-      });
+      setError(null);
+
+      // Fetch dashboard data and pending flashcard count concurrently
+      const [dashResult, fcResult] = await Promise.allSettled([
+        api.get('/dashboard'),
+        getPendingCount()
+      ]);
+
+      if (dashResult.status === 'fulfilled') {
+        const res = dashResult.value;
+        setData(res.data);
+        updateUser({ streak: res.data.stats.streak }); // Sync sidebar
+        triggerFeedback({ 
+          type: COMPANION_EVENTS.DASHBOARD_LOAD, 
+          data: { name: user?.name } 
+        });
+      } else {
+        const err = dashResult.reason;
+        const errMsg = err?.response?.data?.error || err?.message || "";
+        if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
+          toast.error("AI features are temporarily unavailable. Please try again in a moment.");
+        }
+        if (err?.response?.status !== 401) {
+          console.error('Failed to load dashboard data', err);
+        }
+        setError("Unable to load dashboard data. Please check your connection and try again.");
+      }
+
+      if (fcResult.status === 'fulfilled') {
+        setPendingCards(fcResult.value.data?.count ?? 0);
+      } else {
+        setPendingCards(0);
+      }
     } catch (err) {
-      const errMsg = err.response?.data?.error || err.message || "";
-      if (errMsg.includes('AI_CREDIT_LIMIT') || errMsg.includes('AI_RATE_LIMIT')) {
-        toast.error("AI features are temporarily unavailable. Please try again in a moment.");
-      }
-      if (err.response?.status !== 401) {
-        console.error('Failed to load dashboard data', err);
-      }
+      setError("Unable to load dashboard data. Please check your connection and try again.");
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-    // Phase 2: Fetch flashcard review count — isolated so it never breaks the dashboard
-    try {
-      const fcRes = await getPendingCount();
-      setPendingCards(fcRes.data.count ?? 0);
-    } catch (_) {
-      setPendingCards(0);
     }
   };
 
@@ -143,6 +131,27 @@ const Dashboard = () => {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
+
+  // FIX 13: Explicit error state rendering with Retry button (do not show skeleton on error)
+  if (error && !data) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 bg-surface/50 border border-white/10 rounded-2xl text-center space-y-4 max-w-lg mx-auto mt-12">
+        <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400">
+          <RefreshCw size={24} />
+        </div>
+        <h3 className="text-xl font-bold text-white">Failed to Load Dashboard</h3>
+        <p className="text-sm text-gray-400 leading-relaxed">{error}</p>
+        <button
+          onClick={fetchDashboard}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-purple-500/20 disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return (

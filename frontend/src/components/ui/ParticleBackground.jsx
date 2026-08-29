@@ -17,8 +17,9 @@ const getCSSColor = (varName) => {
 const ParticleBackground = memo(({ mode = 'ambient' }) => {
   const [init, setInit] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  // Re-read CSS vars when theme changes
   const [themeKey, setThemeKey] = useState(0);
+  const [isVisible, setIsVisible] = useState(true);
+  const containerRef = React.useRef(null);
 
   useEffect(() => {
     const observer = new MutationObserver(() => setThemeKey(k => k + 1));
@@ -31,6 +32,15 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!containerRef.current || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsVisible(entry.isIntersecting);
+    }, { threshold: 0.05 });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [containerRef.current]);
 
   // this should be run only once per application lifetime
   useEffect(() => {
@@ -122,16 +132,16 @@ const ParticleBackground = memo(({ mode = 'ambient' }) => {
     };
   }, [isMobile, themeKey]);
 
-  if (!init) return null;
-
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      <Particles
-        key={`particles-${mode}-${themeKey}`}
-        id={`particles-${mode}`}
-        options={mode === 'focus' ? focusOptions : ambientOptions}
-        className="w-full h-full absolute inset-0"
-      />
+    <div ref={containerRef} className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {init && isVisible && (
+        <Particles
+          key={`particles-${mode}-${themeKey}`}
+          id={`particles-${mode}`}
+          options={mode === 'focus' ? focusOptions : ambientOptions}
+          className="w-full h-full absolute inset-0"
+        />
+      )}
     </div>
   );
 });

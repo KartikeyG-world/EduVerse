@@ -69,19 +69,47 @@ const StudyPlanner = () => {
     }
   };
 
-  const handleDeletePlan = async (e, planId) => {
+  const handleDeletePlan = (e, planId) => {
     e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this study plan?")) return;
-    
-    setDeletingId(planId);
-    try {
-      await api.delete(`/ai/planner/${planId}`);
-      setSavedPlans(prev => prev.filter(p => p._id !== planId));
-    } catch (err) {
-      console.error("Failed to delete plan:", err);
-    } finally {
-      setDeletingId(null);
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium text-white">Delete this study plan?</span>
+        <div className="flex justify-end gap-2 mt-1">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs text-gray-400 hover:text-white rounded-lg bg-surface/80 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              setDeletingId(planId);
+              try {
+                await api.delete(`/ai/planner/${planId}`);
+                setSavedPlans(prev => prev.filter(p => p._id !== planId));
+                toast.success("Study plan deleted");
+              } catch (err) {
+                console.error("Failed to delete plan:", err);
+                toast.error("Failed to delete plan");
+              } finally {
+                setDeletingId(null);
+              }
+            }}
+            className="px-2.5 py-1 text-xs bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      style: {
+        background: '#18181b',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#fff',
+      }
+    });
   };
 
   const handleGenerate = async (e) => {
@@ -123,9 +151,36 @@ const StudyPlanner = () => {
   };
 
   const resetRoutine = () => {
-    if (window.confirm("Are you sure you want to reset your entire daily routine?")) {
-      setRoutine(defaultRoutine);
-    }
+    toast((t) => (
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-medium text-white">Reset entire daily routine?</span>
+        <div className="flex justify-end gap-2 mt-1">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs text-gray-400 hover:text-white rounded-lg bg-surface/80 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              toast.dismiss(t.id);
+              setRoutine(defaultRoutine);
+              toast.success("Routine reset to default");
+            }}
+            className="px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      style: {
+        background: '#18181b',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#fff',
+      }
+    });
   };
 
   return (

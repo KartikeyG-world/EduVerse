@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -17,6 +18,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import DOMPurify from 'dompurify';
 
 const STATUS = {
   IDLE: '✓ All changes saved',
@@ -512,7 +514,7 @@ const SmartNotes = () => {
           
           <div 
             className="prose max-w-none mb-12 text-slate-800"
-            dangerouslySetInnerHTML={{ __html: editor?.getHTML() || '' }} 
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(editor?.getHTML() || '') }} 
           />
 
           {summary && (
@@ -564,12 +566,12 @@ const SmartNotes = () => {
               >
                 Keep Writing
               </button>
-              <a
-                href="/flashcards/study"
+              <Link
+                to="/flashcards/study"
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-xl text-sm font-bold text-primary transition-all"
               >
                 Study Now <ArrowRight size={14} />
-              </a>
+              </Link>
             </div>
             <button
               onClick={() => setFcResult(null)}
