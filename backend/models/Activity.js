@@ -27,4 +27,7 @@ const ActivitySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// FIX 11: Add compound index for dashboard 7-day activity aggregations
+ActivitySchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Activity", ActivitySchema);

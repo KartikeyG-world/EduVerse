@@ -62,5 +62,7 @@ const topicMasterySchema = new mongoose.Schema({
 
 // Ensure unique topic per user and category
 topicMasterySchema.index({ userId: 1, topicName: 1, category: 1 }, { unique: true });
+topicMasterySchema.index({ userId: 1, isWeakArea: 1 });
+topicMasterySchema.index({ userId: 1, nextRevisionDue: 1 });
 
 module.exports = mongoose.model('TopicMastery', topicMasterySchema);

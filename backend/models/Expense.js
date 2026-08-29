@@ -5,6 +5,7 @@ const expenseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+    index: true,
   },
   amount: {
     type: Number,
@@ -25,5 +26,7 @@ const expenseSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+expenseSchema.index({ userId: 1, date: -1 });
 
 module.exports = mongoose.model("Expense", expenseSchema);

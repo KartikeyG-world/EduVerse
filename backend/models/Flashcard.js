@@ -65,11 +65,20 @@ const flashcardSchema = new mongoose.Schema({
     default: 0,
     min: 0,
   },
+  history: [
+    {
+      date: { type: Date, default: Date.now },
+      rating: { type: Number, min: 0, max: 3 }, // 0: Forgot, 1: Hard, 2: Good, 3: Easy
+    }
+  ],
   // Total review count (all time)
   totalReviews: {
     type: Number,
     default: 0,
   },
 }, { timestamps: true });
+
+// Compound index for optimal spaced repetition review queries
+flashcardSchema.index({ userId: 1, nextReviewDate: 1 });
 
 module.exports = mongoose.model('Flashcard', flashcardSchema);
