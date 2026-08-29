@@ -87,7 +87,7 @@ const skillSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
-}, { timestamps: true });
+}, { timestamps: true, optimisticConcurrency: true });
 
 // Pre-save hook: auto-compute progress and set completed flag
 // Note: Mongoose 9+ uses async middleware (no next() callback)
@@ -113,10 +113,15 @@ skillSchema.pre('save', async function () {
     }
   }
 
-  // Mark as completed when 95% or more is watched
-  if (this.progress >= 95 && !this.completed) {
+  // Set completed flag according to computed progress threshold
+  if (this.progress >= 95) {
     this.completed = true;
+  } else {
+    this.completed = false;
   }
 });
+
+// Compound index for sorting user skills by activity recency
+skillSchema.index({ userId: 1, lastWatched: -1, createdAt: -1 });
 
 module.exports = mongoose.model('Skill', skillSchema);

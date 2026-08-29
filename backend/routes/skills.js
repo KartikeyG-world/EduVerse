@@ -6,84 +6,69 @@ const { protect, optionalAuth } = require('../middlewares/auth');
 const { createNotification } = require('../utils/notification');
 const QuizAttempt = require('../models/QuizAttempt');
 const { updateTopicMastery } = require('../utils/mastery');
-const ytpl = require('ytpl');
-const axios = require('axios');
+const { fetchPlaylistDetails, getPlaylistCount } = require('../integrations/youtubeService');
 
-// Helper to fetch playlist details via ytpl with YouTube API v3 fallback (full pagination)
-const fetchPlaylistDetails = async (playlistId) => {
-  // ── Primary: ytpl (limit: Infinity fetches all pages automatically) ──
-  try {
-    const playlist = await ytpl(playlistId, { limit: Infinity });
-    if (playlist && playlist.items && playlist.items.length > 0) {
-      console.log(`[Playlist] ytpl fetched ${playlist.items.length} videos for playlist ${playlistId}`);
+// In-memory sync throttling map: skillId -> timestamp of last check
+const syncThrottleMap = new Map();
+const SYNC_THROTTLE_MS = 60 * 1000; // 60s throttle between checks
+
+/**
+ * Non-destructively re-syncs playlist videos with YouTube.
+ * Preserves all existing watch progress, completion status, and custom order.
+ */
+const syncPlaylistVideos = async (skill) => {
+  if (!skill || skill.type !== 'playlist' || !skill.playlistData?.playlistId) {
+    return { skill, updated: false };
+  }
+
+  const playlistId = skill.playlistData.playlistId;
+  const fetched = await fetchPlaylistDetails(playlistId);
+  if (!fetched || !fetched.videos || fetched.videos.length === 0) {
+    return { skill, updated: false };
+  }
+
+  const existingVideos = skill.playlistData.videos || [];
+  const existingMap = new Map(existingVideos.map(v => [v.videoId, v]));
+  const existingCompleted = new Set(skill.completedVideos || []);
+
+  let addedCount = 0;
+  const mergedVideos = fetched.videos.map(item => {
+    if (existingMap.has(item.videoId)) {
+      const existing = existingMap.get(item.videoId);
       return {
-        playlistId,
-        totalVideos: playlist.items.length,
-        title: playlist.title || null,
-        videos: playlist.items.map(item => ({
-          title: item.title,
-          videoId: item.id,
-          duration: item.duration || '',
-          thumbnail: item.bestThumbnail?.url || item.thumbnail || `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`,
-          isCompleted: false
-        }))
+        title: item.title || existing.title,
+        videoId: item.videoId,
+        duration: item.duration || existing.duration || '',
+        durationSecs: item.durationSecs || existing.durationSecs || 0,
+        thumbnail: item.thumbnail || existing.thumbnail || null,
+        isCompleted: Boolean(existing.isCompleted || existingCompleted.has(item.videoId)),
+        lastWatchedTimestamp: existing.lastWatchedTimestamp || 0,
+      };
+    } else {
+      addedCount++;
+      return {
+        title: item.title,
+        videoId: item.videoId,
+        duration: item.duration || '',
+        durationSecs: item.durationSecs || 0,
+        thumbnail: item.thumbnail || null,
+        isCompleted: false,
+        lastWatchedTimestamp: 0,
       };
     }
-  } catch (err) {
-    console.warn('[Playlist] ytpl fetch failed, trying YouTube Data API v3 fallback:', err.message);
+  });
+
+  // Only update if video count or composition changed
+  if (addedCount > 0 || mergedVideos.length !== existingVideos.length) {
+    skill.playlistData.videos = mergedVideos;
+    skill.videos = mergedVideos.map(v => v.videoId);
+    skill.playlistData.totalVideos = mergedVideos.length;
+    skill.markModified('playlistData');
+    await skill.save();
+    return { skill, updated: true, addedCount, totalVideos: mergedVideos.length };
   }
 
-  // ── Fallback: YouTube Data API v3 with full nextPageToken pagination ──
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  if (apiKey) {
-    try {
-      const allItems = [];
-      let nextPageToken = null;
-
-      // Paginate through ALL pages until nextPageToken is null (last page)
-      do {
-        const params = {
-          part: 'snippet,contentDetails',
-          playlistId: playlistId,
-          maxResults: 50,
-          key: apiKey,
-        };
-        if (nextPageToken) params.pageToken = nextPageToken;
-
-        const res = await axios.get('https://www.googleapis.com/youtube/v3/playlistItems', { params });
-        const pageItems = res.data.items || [];
-        allItems.push(...pageItems);
-        nextPageToken = res.data.nextPageToken || null;
-
-        console.log(`[Playlist] YT API page fetched: ${pageItems.length} items, nextPageToken: ${nextPageToken || 'none'}`);
-      } while (nextPageToken);
-
-      if (allItems.length > 0) {
-        console.log(`[Playlist] YT API total fetched: ${allItems.length} videos for playlist ${playlistId}`);
-        return {
-          playlistId,
-          totalVideos: allItems.length,
-          videos: allItems
-            .filter(item => item.snippet?.resourceId?.videoId) // skip deleted/private
-            .map(item => ({
-              title: item.snippet.title,
-              videoId: item.snippet.resourceId.videoId,
-              duration: '',
-              thumbnail:
-                item.snippet.thumbnails?.high?.url ||
-                item.snippet.thumbnails?.medium?.url ||
-                item.snippet.thumbnails?.default?.url ||
-                `https://img.youtube.com/vi/${item.snippet.resourceId.videoId}/hqdefault.jpg`,
-              isCompleted: false
-            }))
-        };
-      }
-    } catch (apiErr) {
-      console.warn('[Playlist] YouTube Data API fallback failed:', apiErr.response?.data || apiErr.message);
-    }
-  }
-
-  return null;
+  return { skill, updated: false, totalVideos: mergedVideos.length };
 };
 
 // @route   POST /api/skills
@@ -215,8 +200,49 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // @route   GET /api/skills/:id
-// @desc    Get a specific skill with progress
+// @desc    Get a specific skill with progress (auto-syncs if playlist count changed)
 router.get('/:id', protect, async (req, res) => {
+  try {
+    let skill = await Skill.findOne({ _id: req.params.id, userId: req.user.id });
+
+    if (!skill) {
+      return res.status(404).json({ message: 'Skill not found' });
+    }
+
+    // Lightweight Auto-Sync for playlists (throttled to max 1 check per 60s per skill)
+    if (skill.type === 'playlist' && skill.playlistData?.playlistId) {
+      const skillIdStr = skill._id.toString();
+      const lastChecked = syncThrottleMap.get(skillIdStr) || 0;
+      const now = Date.now();
+
+      if (now - lastChecked > SYNC_THROTTLE_MS) {
+        syncThrottleMap.set(skillIdStr, now);
+        try {
+          const currentCount = await getPlaylistCount(skill.playlistData.playlistId);
+          const storedCount = skill.playlistData.videos?.length || 0;
+
+          if (currentCount && currentCount !== storedCount) {
+            const syncResult = await syncPlaylistVideos(skill);
+            if (syncResult.updated) {
+              skill = syncResult.skill;
+            }
+          }
+        } catch (syncErr) {
+          console.warn('[Skills:AutoSync Error]:', syncErr.message);
+        }
+      }
+    }
+
+    res.json(skill);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+});
+
+// @route   POST /api/skills/:id/sync
+// @desc    Explicitly re-sync playlist with source YouTube playlist
+router.post('/:id/sync', protect, async (req, res) => {
   try {
     const skill = await Skill.findOne({ _id: req.params.id, userId: req.user.id });
 
@@ -224,10 +250,21 @@ router.get('/:id', protect, async (req, res) => {
       return res.status(404).json({ message: 'Skill not found' });
     }
 
-    res.json(skill);
+    if (skill.type !== 'playlist' || !skill.playlistData?.playlistId) {
+      return res.status(400).json({ message: 'Skill is not a playlist or missing playlist ID' });
+    }
+
+    const result = await syncPlaylistVideos(skill);
+    res.json({
+      success: true,
+      updated: result.updated,
+      addedCount: result.addedCount || 0,
+      totalVideos: result.totalVideos || skill.playlistData?.videos?.length || 0,
+      skill: result.skill,
+    });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    console.error('[Skills:ManualSync Error]:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to sync playlist' });
   }
 });
 
@@ -242,20 +279,32 @@ router.put('/:id/progress', protect, async (req, res) => {
       return res.status(404).json({ message: 'Skill not found' });
     }
 
-    // Lock updates after completion (high-water mark — never go backward)
-    if (skill.completed) {
+    // Lock updates for single-video skills after completion (high-water mark — never go backward)
+    if (skill.type !== 'playlist' && skill.completed) {
       return res.json(skill);
     }
 
     // Track pre-save state to detect newly-completed skills for XP reward
-    const wasCompleted = false; // Always false here — we returned above if already completed
+    const wasCompleted = skill.completed;
+    let prevVideoIndex = undefined;
 
     if (skill.type === 'playlist') {
       const targetVid = videoId || completedVideoId;
 
       if (skill.playlistData) {
-        if (currentVideoIndex !== undefined) skill.playlistData.currentVideoIndex = currentVideoIndex;
-        if (lastWatchedTimestamp !== undefined) skill.playlistData.lastWatchedTimestamp = lastWatchedTimestamp;
+        prevVideoIndex = skill.playlistData.currentVideoIndex;
+        // Monotonic Resume Pointer: only advance forward
+        if (currentVideoIndex !== undefined) {
+          skill.playlistData.currentVideoIndex = Math.max(skill.playlistData.currentVideoIndex || 0, currentVideoIndex);
+        }
+        // Timestamp at playlist level
+        if (lastWatchedTimestamp !== undefined) {
+          if (lastWatchedTimestamp === 0 && (isCompleted || completedVideoId)) {
+            skill.playlistData.lastWatchedTimestamp = 0;
+          } else if (lastWatchedTimestamp > (skill.playlistData.lastWatchedTimestamp || 0)) {
+            skill.playlistData.lastWatchedTimestamp = lastWatchedTimestamp;
+          }
+        }
         skill.markModified('playlistData');
       }
 
@@ -270,8 +319,21 @@ router.put('/:id/progress', protect, async (req, res) => {
         if (skill.playlistData && skill.playlistData.videos) {
           const vidItem = skill.playlistData.videos.find(v => v.videoId === targetVid);
           if (vidItem) {
-            if (shouldComplete !== null) vidItem.isCompleted = shouldComplete;
-            if (lastWatchedTimestamp !== undefined) vidItem.lastWatchedTimestamp = lastWatchedTimestamp;
+            // Monotonic completion: Never unmark a completed video unless explicit false is provided
+            if (shouldComplete === true) {
+              vidItem.isCompleted = true;
+            } else if (shouldComplete === false) {
+              vidItem.isCompleted = false;
+            }
+
+            // Monotonic timestamp: never decrease stored timestamp during replay unless resetting to 0 on finish
+            if (lastWatchedTimestamp !== undefined) {
+              if (lastWatchedTimestamp === 0 && shouldComplete === true) {
+                vidItem.lastWatchedTimestamp = 0;
+              } else if (lastWatchedTimestamp > (vidItem.lastWatchedTimestamp || 0)) {
+                vidItem.lastWatchedTimestamp = lastWatchedTimestamp;
+              }
+            }
           }
           skill.markModified('playlistData');
         }
@@ -322,6 +384,12 @@ router.put('/:id/progress', protect, async (req, res) => {
         `🎉 You mastered "${skill.title}" and earned ${xpReward} XP!`
       );
     }
+
+    // Server-side safety net reconciler for watch-range quiz generation
+    const { reconcilePlaylistProgress } = require('../jobs/quizGenerationJob');
+    reconcilePlaylistProgress(req.user.id, skill, { ...req.body, prevVideoIndex }).catch((e) => {
+      console.warn('[Skills:ProgressReconcile Error]:', e.message);
+    });
 
     res.json(skill);
   } catch (err) {
@@ -409,5 +477,9 @@ router.delete('/:id', protect, async (req, res) => {
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 });
+
+router.syncPlaylistVideos = syncPlaylistVideos;
+router.syncThrottleMap = syncThrottleMap;
+router.SYNC_THROTTLE_MS = SYNC_THROTTLE_MS;
 
 module.exports = router;
