@@ -91,7 +91,7 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
   };
 
   const handleContinue = () => {
-    if (!completed) navigate(`/skills/${_id}/learn`);
+    navigate(`/skills/${_id}/learn`);
   };
 
   return (
@@ -202,10 +202,15 @@ const SkillCard = ({ skill, index, onDelete, onOpenCalendar }) => {
       {/* Action buttons */}
       <div className="mt-6 flex gap-2">
         {completed ? (
-          <div className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold bg-yellow-400/10 text-yellow-400 border border-yellow-400/20">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleContinue}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 hover:bg-yellow-400/20 transition-all cursor-pointer"
+          >
             <CheckCircle size={16} />
-            Completed
-          </div>
+            Review Course
+          </motion.button>
         ) : (
           <motion.button
             whileHover={{ scale: 1.02 }}

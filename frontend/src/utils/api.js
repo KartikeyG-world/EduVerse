@@ -28,6 +28,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    try {
+      config.headers['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      config.headers['X-Timezone-Offset'] = new Date().getTimezoneOffset();
+    } catch (_) {}
     return config;
   },
   (error) => {
