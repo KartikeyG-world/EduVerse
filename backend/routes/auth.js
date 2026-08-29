@@ -7,7 +7,7 @@ const User = require("../models/User");
 const { protect } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
 const { updateStreak } = require("../utils/streak");
-const { sendOtpEmail, sendWelcomeEmail } = require("../utils/emailSender");
+const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require("../utils/emailSender");
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const { OAuth2Client } = require("google-auth-library");
@@ -33,12 +33,16 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ success: false, message: "Please provide all required fields" });
     }
 
-    if (name.length < 2) {
+    const normalizedName = name.trim();
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPhone = phone ? phone.trim() : undefined;
+
+    if (normalizedName.length < 2) {
       return res.status(400).json({ success: false, message: "Name must be at least 2 characters long" });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return res.status(400).json({ success: false, message: "Invalid email format" });
     }
 
@@ -47,13 +51,13 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ success: false, message: "Password must be at least 8 characters, include uppercase, lowercase, number, and special character" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ success: false, message: "User already exists with that email" });
     }
 
-    if (phone) {
-      const existingPhone = await User.findOne({ phone });
+    if (normalizedPhone) {
+      const existingPhone = await User.findOne({ phone: normalizedPhone });
       if (existingPhone) {
         return res.status(400).json({ success: false, message: "User already exists with that phone number" });
       }
@@ -66,9 +70,9 @@ router.post("/register", async (req, res) => {
     const hashedOTP = hashData(otp);
 
     const newUser = new User({
-      name,
-      email,
-      phone: phone || undefined,
+      name: normalizedName,
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password: hashedPassword,
       otp: hashedOTP,
       otpExpiry: Date.now() + 10 * 60 * 1000,
@@ -117,21 +121,11 @@ router.post("/verify-otp", async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
+    // Guard: Prevent OTP bypass — already-verified users must authenticate via /api/auth/login
     if (user.isVerified) {
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
-      return res.json({
-        success: true,
-        token,
-        user: { 
-          id: user._id, 
-          name: user.name, 
-          email: user.email, 
-          avatar: user.avatar, 
-          xp: user.xp, 
-          level: user.level,
-          streak: user.streak,
-          focusHours: user.focusHours
-        }
+      return res.status(400).json({
+        success: false,
+        message: "Account is already verified. Please sign in with your credentials."
       });
     }
 
@@ -229,8 +223,9 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ success: false, message: "Please enter both credentials" });
     }
 
-    const isEmail = loginId.includes("@");
-    const query = isEmail ? { email: loginId } : { phone: loginId };
+    const cleanLoginId = loginId.trim();
+    const isEmail = cleanLoginId.includes("@");
+    const query = isEmail ? { email: cleanLoginId.toLowerCase() } : { phone: cleanLoginId };
     const user = await User.findOne(query);
     
     if (!user) {
@@ -281,7 +276,8 @@ router.post("/login", async (req, res) => {
     user.lastLogin = Date.now();
     await user.save();
 
-    const updatedUser = await updateStreak(user);
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
 
@@ -312,7 +308,8 @@ router.post("/forgot-password", async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: "Email is required" });
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.json({ success: true, message: "If this email is registered, a reset link has been sent" });
     }
@@ -325,6 +322,14 @@ router.post("/forgot-password", async (req, res) => {
     await user.save();
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
+
+    // Dispatch password reset email (FIX 4)
+    try {
+      await sendPasswordResetEmail(user.email, resetLink, user.name);
+    } catch (emailErr) {
+      console.error("[AUTH] Failed to send password reset email:", emailErr.message);
+      // Still return the generic message to avoid email enumeration
+    }
 
     res.json({ success: true, message: "If this email is registered, a reset link has been sent" });
   } catch (err) {
@@ -383,6 +388,7 @@ router.get("/me", protect, async (req, res) => {
     
     res.json({
       id: user._id,
+      _id: user._id,
       name: user.name,
       email: user.email,
       avatar: user.avatar,
@@ -411,8 +417,25 @@ router.put("/update-profile", protect, async (req, res) => {
     }
 
     const updateData = {};
-    if (name) updateData.name = name;
-    if (avatar !== undefined) updateData.avatar = avatar;
+    if (name) updateData.name = name.trim();
+    if (avatar !== undefined) {
+      if (avatar !== "" && avatar !== null) {
+        if (typeof avatar !== 'string' || avatar.length > 500) {
+          return res.status(400).json({ success: false, message: "Avatar URL is invalid or exceeds 500 characters" });
+        }
+        try {
+          const parsedUrl = new URL(avatar);
+          if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            return res.status(400).json({ success: false, message: "Avatar URL must use http or https protocol" });
+          }
+        } catch (_) {
+          return res.status(400).json({ success: false, message: "Avatar must be a valid URL" });
+        }
+        updateData.avatar = avatar.trim();
+      } else {
+        updateData.avatar = "";
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -517,7 +540,8 @@ router.post("/google", async (req, res) => {
       sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
     }
 
-    const updatedUser = await updateStreak(user);
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d"
@@ -630,7 +654,8 @@ router.post("/facebook", async (req, res) => {
       sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
     }
 
-    const updatedUser = await updateStreak(user);
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d"

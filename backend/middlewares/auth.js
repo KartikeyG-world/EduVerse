@@ -12,10 +12,14 @@ const protect = async (req, res, next) => {
         return res.status(401).json({ success: false, message: "Not authorized, no token" });
       }
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry");
-      if (!req.user) {
+      const user = await User.findById(decoded.id)
+        .select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry")
+        .lean();
+      if (!user) {
         return res.status(401).json({ success: false, message: "User no longer exists" });
       }
+      req.user = user;
+      req.user.id = user._id.toString();
       return next();
     } catch (error) {
       return res.status(401).json({ success: false, message: "Not authorized, token invalid or expired" });
@@ -32,9 +36,12 @@ const optionalAuth = async (req, res, next) => {
       const token = req.headers.authorization.split(" ")[1];
       if (token && token !== "null" && token !== "undefined") {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.id).select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry");
+        const user = await User.findById(decoded.id)
+          .select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry")
+          .lean();
         if (user) {
           req.user = user;
+          req.user.id = user._id.toString();
           return next();
         }
       }

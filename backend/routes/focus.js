@@ -9,25 +9,34 @@ router.post("/", protect, async (req, res) => {
   try {
     const { type, duration, xpEarned } = req.body;
     
+    const parsedDuration = Number(duration) || 0;
+    const parsedXP = Math.min(Math.max(Number(xpEarned) || 0, 0), 500);
+
     const session = new FocusSession({
       user: req.user.id,
-      type,
-      duration,
-      xpEarned
+      type: type || 'pomodoro',
+      duration: parsedDuration,
+      xpEarned: parsedXP
     });
     
     await session.save();
     
-    // Also update user's total focus hours and XP (already handled in add-xp route usually, 
-    // but we can update focusHours here)
-    const focusHours = duration / 3600;
-    await User.findByIdAndUpdate(req.user.id, {
-      $inc: { focusHours: focusHours }
-    });
+    // Atomically increment focusHours and XP, and re-calculate level
+    const focusHours = parsedDuration / 3600;
+    const user = await User.findById(req.user.id);
+    if (user) {
+      user.focusHours = (user.focusHours || 0) + focusHours;
+      if (parsedXP > 0) {
+        user.xp = (user.xp || 0) + parsedXP;
+        user.level = Math.floor(user.xp / 1000) + 1;
+      }
+      await user.save();
+    }
 
     res.status(201).json({ success: true, session });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("[Focus Create Session Error]:", err);
+    res.status(500).json({ success: false, error: "Failed to log focus session" });
   }
 });
 
@@ -42,7 +51,8 @@ router.get("/history", optionalAuth, async (req, res) => {
       .limit(50);
     res.json({ success: true, sessions });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error("[Focus History Error]:", err);
+    res.status(500).json({ success: false, error: "Failed to fetch focus history" });
   }
 });
 

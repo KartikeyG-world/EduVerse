@@ -32,23 +32,25 @@ router.post('/track', protect, async (req, res) => {
 // @desc    Get learning analytics summary
 router.get('/stats', protect, async (req, res) => {
   try {
-    const topics = await TopicMastery.find({ userId: req.user.id });
+    const topics = await TopicMastery.find({ userId: req.user.id })
+      .select('masteryScore isWeakArea nextRevisionDue correctAttempts wrongAttempts topicName')
+      .lean();
     
     const totalTopics = topics.length;
     const masteredTopics = topics.filter(t => t.masteryScore >= 80).length;
     const weakTopics = topics.filter(t => t.isWeakArea).length;
     
     const now = new Date();
-    const revisionDue = topics.filter(t => t.nextRevisionDue <= now).length;
+    const revisionDue = topics.filter(t => t.nextRevisionDue && new Date(t.nextRevisionDue) <= now).length;
     
     const averageMastery = totalTopics > 0 
-      ? Math.round(topics.reduce((acc, t) => acc + t.masteryScore, 0) / totalTopics)
+      ? Math.round(topics.reduce((acc, t) => acc + (t.masteryScore || 0), 0) / totalTopics)
       : 0;
 
     // Improvement areas (topics with high correctAttempts)
     const improvementAreas = topics
-      .filter(t => t.correctAttempts > t.wrongAttempts)
-      .sort((a, b) => (b.correctAttempts - b.wrongAttempts) - (a.correctAttempts - a.wrongAttempts))
+      .filter(t => (t.correctAttempts || 0) > (t.wrongAttempts || 0))
+      .sort((a, b) => ((b.correctAttempts || 0) - (b.wrongAttempts || 0)) - ((a.correctAttempts || 0) - (a.wrongAttempts || 0)))
       .slice(0, 3)
       .map(t => t.topicName);
 

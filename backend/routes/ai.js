@@ -7,95 +7,9 @@ const { fetchResourcesForTopic } = require("../utils/resources");
 const Activity = require("../models/Activity");
 const ChatMessage = require("../models/ChatMessage");
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const { generateAICompletion, parseJSONSafely } = require("../services/aiGateway");
 
-// Helper for making OpenRouter API calls
-const openRouterCall = async (messages) => {
-  try {
-    // Defensive: cap token limits to 1500 to avoid pre-flight credit check failures (402)
-    const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1500, 1500);
-    const response = await axios.post(
-      OPENROUTER_URL,
-      {
-        model: "openai/gpt-3.5-turbo",
-        messages: messages,
-        max_tokens: MAX_TOKENS
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "http://localhost:5000",
-          "X-OpenRouter-Title": "EduVerse AI"
-        }
-      }
-    );
-
-    const data = response.data;
-    if (!data?.choices?.[0]?.message?.content) {
-      console.error("Malformed response from OpenRouter:", data);
-      throw new Error("Invalid response format from OpenRouter");
-    }
-
-    return data.choices[0].message.content;
-  } catch (error) {
-    const status = error?.response?.status;
-    const msg = error?.response?.data?.error?.message 
-                || error.message;
-
-    if (status === 402) throw new Error(
-      'AI_CREDIT_LIMIT: AI unavailable. Try again shortly.'
-    );
-    if (status === 429) throw new Error(
-      'AI_RATE_LIMIT: Too many requests. Wait and retry.'
-    );
-    throw new Error(msg);
-  }
-};
-
-// Helper to clean JSON response — gracefully handles truncated AI output
-const parseJSONSafely = (text) => {
-  // Step 1: Strip markdown fences
-  let cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-
-  // Step 2: Attempt a clean parse first (happy path)
-  try {
-    return JSON.parse(cleaned);
-  } catch (_) {
-    // Fell through — likely a truncated response. Attempt recovery below.
-  }
-
-  // Step 3: Extract all fully-formed day objects from the truncated string.
-  // Each day block ends with a closing } before the next { "day": N or the end.
-  // We collect every complete { ... } object from inside the roadmap array.
-  try {
-    const dayObjects = [];
-    // Match each complete JSON object in the array (greedy, handles nested arrays)
-    const objectPattern = /\{\s*"day"\s*:\s*\d+[\s\S]*?"tasks"\s*:\s*\[[\s\S]*?\]\s*\}/g;
-    let match;
-    while ((match = objectPattern.exec(cleaned)) !== null) {
-      try {
-        const obj = JSON.parse(match[0]);
-        if (obj.day && obj.topic && Array.isArray(obj.tasks)) {
-          dayObjects.push(obj);
-        }
-      } catch (_) {
-        // Skip any malformed individual object
-      }
-    }
-
-    if (dayObjects.length > 0) {
-      console.warn(`[parseJSONSafely] Recovered ${dayObjects.length} day(s) from truncated AI response.`);
-      return { roadmap: dayObjects };
-    }
-  } catch (_) {
-    // Recovery also failed — fall through to hard error
-  }
-
-  // Step 4: Nothing recoverable — log and throw
-  console.error("Failed to parse JSON:", text);
-  throw new Error("Invalid JSON structure");
-};
+const openRouterCall = (messages, maxTokens = null) => generateAICompletion({ messages, maxTokens });
 
 
 // AI Study Planner
@@ -134,11 +48,12 @@ Respond ONLY with valid JSON in this exact structure:
       throw new Error("AI returned invalid roadmap structure");
     }
 
-    // Step 2: Fetch YouTube + article resources for all days in parallel
+    // Step 2: Fetch YouTube + article resources for all days in parallel (cap live YT API calls to first 5 days)
     const enrichedRoadmap = await Promise.all(
-      parsedContent.roadmap.map(async (day) => {
+      parsedContent.roadmap.map(async (day, idx) => {
         try {
-          const resources = await fetchResourcesForTopic(day.topic, subject);
+          const fetchFullVideos = idx < 5;
+          const resources = await fetchResourcesForTopic(day.topic, subject, fetchFullVideos);
           return { ...day, resources };
         } catch (err) {
           console.warn(`Resource fetch failed for Day ${day.day}:`, err.message);
@@ -162,8 +77,8 @@ Respond ONLY with valid JSON in this exact structure:
 
     res.json(savedPlan);
   } catch (err) {
-    console.error("AI Planner error:", err);
-    res.status(500).json({ error: "Failed to generate study plan", message: err.message });
+    console.error("[AI Planner Error]:", err);
+    res.status(500).json({ error: "Failed to generate study plan", message: "Failed to generate study plan. Please try again." });
   }
 });
 
@@ -174,6 +89,7 @@ router.get("/planner", optionalAuth, async (req, res) => {
     const plans = await Plan.find({ userId: req.user._id }).sort({ createdAt: -1 });
     res.json(plans);
   } catch (err) {
+    console.error("[AI Get Plans Error]:", err);
     res.status(500).json({ error: "Failed to fetch study plans" });
   }
 });
@@ -191,7 +107,7 @@ router.delete("/planner/:id", protect, async (req, res) => {
     await plan.deleteOne();
     res.status(200).json({ message: "Plan deleted successfully" });
   } catch (err) {
-    console.error("Failed to delete plan:", err);
+    console.error("[AI Delete Plan Error]:", err);
     res.status(500).json({ error: "Failed to delete plan" });
   }
 });
@@ -223,8 +139,8 @@ router.post("/summarize", protect, async (req, res) => {
 
     res.json({ summary: summaryText });
   } catch (err) {
-    console.error("AI Summarizer error:", err);
-    res.status(500).json({ error: "Failed to summarize notes", message: err.message });
+    console.error("[AI Summarizer Error]:", err);
+    res.status(500).json({ error: "Failed to summarize notes", message: "Failed to summarize notes. Please try again." });
   }
 });
 
@@ -264,7 +180,8 @@ router.post("/chat", protect, async (req, res) => {
 
     messages.push({ role: "user", content: message });
 
-    const replyText = await openRouterCall(messages);
+    const maxTokens = req.body.max_tokens || (isSystemMessage ? 2500 : 1500);
+    const replyText = await openRouterCall(messages, maxTokens);
     
     // Save assistant reply
     if (!isSystemMessage) {
@@ -280,8 +197,8 @@ router.post("/chat", protect, async (req, res) => {
 
     res.json({ reply: replyText });
   } catch (err) {
-    console.error("AI Chatbot error:", err);
-    res.status(500).json({ error: "Failed to get chatbot response", message: err.message });
+    console.error("[AI Chatbot Error]:", err);
+    res.status(500).json({ error: "Failed to get chatbot response", message: "Failed to get chatbot response. Please try again." });
   }
 });
 

@@ -10,13 +10,16 @@ const { updateStreak } = require("../utils/streak");
 // Re-using the robust OpenRouter proxy pattern
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
+// Bounded in-memory insight cache: userId -> { insight, timestamp, level }
+const insightCache = new Map();
+const INSIGHT_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
 const generateInsight = async (userName, stats) => {
   try {
     const prompt = `You are an encouraging AI Coach studying inside a premium learning dashboard.
 The student, ${userName}, has accumulated ${stats.level} levels, a ${stats.streak} day streak, and focused for ${stats.focusHours.toFixed(1)} hours.
 Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep it under 2 sentences. Use emojis.`;
 
-    // Defensive: cap token limits to 1000 for short encouraging tips to avoid credit errors
     const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1000, 1000);
     const response = await axios.post(OPENROUTER_URL, 
       {
@@ -28,9 +31,10 @@ Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep
         headers: {
           "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "http://localhost:5000",
+          "HTTP-Referer": process.env.FRONTEND_URL || "https://edu-verse-psi.vercel.app",
           "X-OpenRouter-Title": "EduVerse AI"
-        }
+        },
+        timeout: 4000
       }
     );
 
@@ -39,6 +43,24 @@ Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep
     console.error("AI Insight Generation Failed:", error.message || error);
     return "Consistent focus brings massive results! 🧠✨";
   }
+};
+
+const getCachedOrGenerateInsight = async (userId, userName, stats) => {
+  const cached = insightCache.get(userId.toString());
+  if (cached && (Date.now() - cached.timestamp < INSIGHT_TTL_MS) && cached.level === stats.level) {
+    return cached.insight;
+  }
+  const insight = await generateInsight(userName, stats);
+  if (insightCache.size > 2000) {
+    const firstKey = insightCache.keys().next().value;
+    insightCache.delete(firstKey);
+  }
+  insightCache.set(userId.toString(), {
+    insight,
+    timestamp: Date.now(),
+    level: stats.level
+  });
+  return insight;
 };
 
 // GET /api/dashboard
@@ -67,8 +89,9 @@ router.get("/", optionalAuth, async (req, res) => {
       });
     }
 
-    // Update daily streak on dashboard load for authenticated users
-    user = await updateStreak(user);
+    // Update daily streak on dashboard load for authenticated users (timezone-aware)
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    user = await updateStreak(user, timezone);
 
     // 1. Calculate Last 7 Days Activity Array for the UI Recharts
     const sevenDaysAgo = new Date();
@@ -147,8 +170,8 @@ router.get("/", optionalAuth, async (req, res) => {
         : 0
     };
 
-    // 3. Dynamic Insight Text
-    const insightText = await generateInsight(user.name, {
+    // 3. Dynamic Insight Text (Cached)
+    const insightText = await getCachedOrGenerateInsight(user._id, user.name, {
         level: user.level || 1,
         streak: user.streak || 0,
         focusHours: user.focusHours || 0
