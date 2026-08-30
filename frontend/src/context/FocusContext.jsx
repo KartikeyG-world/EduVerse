@@ -30,23 +30,27 @@ export const FocusProvider = ({ children }) => {
   useEffect(() => { activeSessionRef.current = activeSessionId; }, [activeSessionId]);
   useEffect(() => { stopwatchTimeRef.current = stopwatchTime; },   [stopwatchTime]);
 
-  // ── XP / Session Complete ─────────────────────────────────────────────────
+  // ── XP / Session Complete (Single Source of Truth: POST /focus) ───────────
   const handleSessionComplete = useCallback(async (secondsFocused) => {
     if (!isAuthenticated) return;
     try {
       const xpToEarn = Math.floor(secondsFocused / 30);
-      
-      if (xpToEarn > 0) {
-        const res = await api.put('/users/add-xp', { xpToAdd: xpToEarn, focusSeconds: secondsFocused });
-        updateUser({ streak: res.data.streak });
-      }
 
-      // Save focus session to DB
-      await api.post('/focus', {
+      // Save focus session to DB (sole source of truth for XP and focus hours)
+      const res = await api.post('/focus', {
         type: timerTypeRef.current,
         duration: secondsFocused,
         xpEarned: xpToEarn
       });
+
+      if (res.data?.user) {
+        updateUser({
+          xp: res.data.user.xp,
+          level: res.data.user.level,
+          focusHours: res.data.user.focusHours,
+          streak: res.data.user.streak
+        });
+      }
       
       // Always trigger feedback so the event flow completes regardless of XP gained
       triggerFeedback({

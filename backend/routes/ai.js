@@ -6,6 +6,7 @@ const axios = require("axios");
 const { fetchResourcesForTopic } = require("../utils/resources");
 const Activity = require("../models/Activity");
 const ChatMessage = require("../models/ChatMessage");
+const ChatSession = require("../models/ChatSession");
 
 const { generateAICompletion, parseJSONSafely } = require("../services/aiGateway");
 
@@ -147,19 +148,10 @@ router.post("/summarize", protect, async (req, res) => {
 // AI Chatbot
 router.post("/chat", protect, async (req, res) => {
   try {
-    const { message, history, isSystemMessage } = req.body;
+    const { message, history, isSystemMessage, sessionId } = req.body;
 
     if (!isSystemMessage && (!message || typeof message !== 'string' || message.trim().length === 0)) {
       return res.status(400).json({ error: "Message content cannot be empty" });
-    }
-
-    // Save user message
-    if (!isSystemMessage) {
-      await ChatMessage.create({
-        user: req.user.id,
-        role: "user",
-        content: message
-      });
     }
 
     const messages = [
@@ -183,13 +175,27 @@ router.post("/chat", protect, async (req, res) => {
     const maxTokens = req.body.max_tokens || (isSystemMessage ? 2500 : 1500);
     const replyText = await openRouterCall(messages, maxTokens);
     
-    // Save assistant reply
+    // Save to unified ChatSession if not an automated system prompt
     if (!isSystemMessage) {
-      await ChatMessage.create({
-        user: req.user.id,
-        role: "assistant",
-        content: replyText
-      });
+      let session = null;
+      if (sessionId) {
+        session = await ChatSession.findOne({ _id: sessionId, userId: req.user._id });
+      }
+      if (!session) {
+        // Find most recent session or create one
+        session = await ChatSession.findOne({ userId: req.user._id }).sort({ updatedAt: -1 });
+      }
+      if (!session) {
+        session = new ChatSession({
+          userId: req.user._id,
+          title: message.length > 40 ? message.substring(0, 40) + "..." : message,
+          messages: []
+        });
+      }
+
+      session.messages.push({ role: "user", content: message });
+      session.messages.push({ role: "assistant", content: replyText });
+      await session.save();
 
       // Log Activity
       await Activity.create({ userId: req.user._id, type: 'chat', duration: 0 });
@@ -202,13 +208,20 @@ router.post("/chat", protect, async (req, res) => {
   }
 });
 
-// GET Chat History
+// GET Chat History (reads from unified ChatSession, with legacy ChatMessage fallback)
 router.get("/chat/history", optionalAuth, async (req, res) => {
   try {
     if (!req.user) {
       return res.json({ success: true, history: [] });
     }
-    const messages = await ChatMessage.find({ user: req.user.id })
+
+    const latestSession = await ChatSession.findOne({ userId: req.user.id || req.user._id }).sort({ updatedAt: -1 });
+    if (latestSession && latestSession.messages && latestSession.messages.length > 0) {
+      return res.json({ success: true, messages: latestSession.messages });
+    }
+
+    // Fallback to legacy ChatMessage records if no sessions exist
+    const messages = await ChatMessage.find({ user: req.user.id || req.user._id })
       .sort({ timestamp: 1 })
       .limit(100);
     res.json({ success: true, messages });

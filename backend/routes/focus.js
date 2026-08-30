@@ -2,9 +2,11 @@ const express = require("express");
 const router = express.Router();
 const FocusSession = require("../models/FocusSession");
 const User = require("../models/User");
-const { protect, optionalAuth } = require("../middlewares/auth");
+const Activity = require("../models/Activity");
+const { createNotification } = require("../utils/notification");
+const { protect, optionalAuth, invalidateUserCache } = require("../middlewares/auth");
 
-// Log a new focus session
+// Log a new focus session (sole source of truth for focus session XP and focus hours)
 router.post("/", protect, async (req, res) => {
   try {
     const { type, duration, xpEarned } = req.body;
@@ -31,9 +33,33 @@ router.post("/", protect, async (req, res) => {
         user.level = Math.floor(user.xp / 1000) + 1;
       }
       await user.save();
+      invalidateUserCache(user._id);
+
+      // Log Activity for Charts
+      if (parsedDuration > 0) {
+        await Activity.create({
+          userId: user._id,
+          type: 'study',
+          duration: parsedDuration
+        });
+        await createNotification(user._id, 'FOCUS', `Amazing work! You completed ${(parsedDuration/60).toFixed(1)} minutes of deep focus session.`);
+      }
+
+      if (parsedXP > 0) {
+        await createNotification(user._id, 'XP', `You earned ${parsedXP} XP for your focus session! Keep climbing towards Level ${user.level + 1}.`);
+      }
     }
 
-    res.status(201).json({ success: true, session });
+    res.status(201).json({
+      success: true,
+      session,
+      user: user ? {
+        xp: user.xp,
+        level: user.level,
+        focusHours: user.focusHours,
+        streak: user.streak || 0
+      } : null
+    });
   } catch (err) {
     console.error("[Focus Create Session Error]:", err);
     res.status(500).json({ success: false, error: "Failed to log focus session" });

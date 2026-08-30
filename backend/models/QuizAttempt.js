@@ -33,4 +33,8 @@ const quizAttemptSchema = new mongoose.Schema({
   },
 });
 
+// Compound indexes for fast calendar performance and user query lookups (FIX 13)
+quizAttemptSchema.index({ skillId: 1, userId: 1, date: -1 });
+quizAttemptSchema.index({ userId: 1, date: -1 });
+
 module.exports = mongoose.model('QuizAttempt', quizAttemptSchema);

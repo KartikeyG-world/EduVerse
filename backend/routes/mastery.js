@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/auth');
 const TopicMastery = require('../models/TopicMastery');
-const { updateTopicMastery } = require('../utils/mastery');
+const { updateTopicMastery, isRevisionDue } = require('../utils/mastery');
 
 // @route   POST /api/mastery/track
 // @desc    Manually track or update topic progress
@@ -18,7 +18,8 @@ router.post('/track', protect, async (req, res) => {
       isCorrect,
       confidence,
       difficulty,
-      notes
+      notes,
+      sourceType: 'manual'
     });
 
     res.json(topic);
@@ -33,15 +34,15 @@ router.post('/track', protect, async (req, res) => {
 router.get('/stats', protect, async (req, res) => {
   try {
     const topics = await TopicMastery.find({ userId: req.user.id })
-      .select('masteryScore isWeakArea nextRevisionDue correctAttempts wrongAttempts topicName')
+      .select('masteryScore isWeakArea nextRevisionDue correctAttempts wrongAttempts topicName canonicalTopicName category categories')
       .lean();
     
     const totalTopics = topics.length;
-    const masteredTopics = topics.filter(t => t.masteryScore >= 80).length;
+    const masteredTopics = topics.filter(t => (t.masteryScore || 0) >= 80).length;
     const weakTopics = topics.filter(t => t.isWeakArea).length;
     
     const now = new Date();
-    const revisionDue = topics.filter(t => t.nextRevisionDue && new Date(t.nextRevisionDue) <= now).length;
+    const revisionDue = topics.filter(t => isRevisionDue(t, now)).length;
     
     const averageMastery = totalTopics > 0 
       ? Math.round(topics.reduce((acc, t) => acc + (t.masteryScore || 0), 0) / totalTopics)
@@ -87,10 +88,12 @@ router.get('/weak', protect, async (req, res) => {
 router.get('/revision', protect, async (req, res) => {
   try {
     const now = new Date();
-    const topics = await TopicMastery.find({ 
+    const allUserTopics = await TopicMastery.find({ 
       userId: req.user.id, 
-      nextRevisionDue: { $lte: now } 
+      nextRevisionDue: { $ne: null, $lte: now } 
     }).sort({ nextRevisionDue: 1 });
+
+    const topics = allUserTopics.filter(t => isRevisionDue(t, now));
     res.json(topics);
   } catch (err) {
     console.error(err.message);

@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
-const { protect } = require("../middlewares/auth");
+const { protect, invalidateUserCache } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
 const { updateStreak } = require("../utils/streak");
 const { sendOtpEmail, sendWelcomeEmail, sendPasswordResetEmail } = require("../utils/emailSender");
@@ -23,6 +23,28 @@ const resendOtpLimiter = rateLimit({
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashData = (data) => crypto.createHash("sha256").update(data).digest("hex");
+
+// HttpOnly Cookie Helpers for Secure Session Management (FIX 5)
+const setAuthCookie = (res, token) => {
+  const isProd = process.env.NODE_ENV === "production";
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  });
+};
+
+const clearAuthCookie = (res) => {
+  const isProd = process.env.NODE_ENV === "production";
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/"
+  });
+};
 
 // @route   POST /api/auth/register
 router.post("/register", async (req, res) => {
@@ -150,8 +172,10 @@ router.post("/verify-otp", async (req, res) => {
     user.otpExpiry = null;
     user.otpAttempts = 0;
     await user.save();
+    invalidateUserCache(user._id);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
+    setAuthCookie(res, token);
 
     await createNotification(user._id, 'WELCOME', `Welcome to EduVerse, ${user.name}!`);
     sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
@@ -165,7 +189,7 @@ router.post("/verify-otp", async (req, res) => {
         email: user.email, 
         avatar: user.avatar, 
         xp: user.xp, 
-        level: user.level,
+        level: user.level, 
         streak: user.streak || 0,
         focusHours: user.focusHours || 0,
         tutorPoints: user.tutorPoints || 0
@@ -234,6 +258,15 @@ router.post("/login", async (req, res) => {
     }
 
 
+    // Account Lockout Guard (FIX 4)
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
+      return res.status(423).json({
+        success: false,
+        message: `Account is temporarily locked due to consecutive failed login attempts. Please try again in ${remainingMinutes} minute(s).`
+      });
+    }
+
     if (!user.isVerified) {
       const otp = generateOTP();
       const hashedOTP = hashData(otp);
@@ -269,17 +302,41 @@ router.post("/login", async (req, res) => {
     
     if (!isMatch) {
       console.log(`Password mismatch for: ${user.email || user.phone}`);
-      return res.status(400).json({ success: false, message: "Invalid credentials" });
+      
+      // Increment failed attempts and set 15-minute lock if >= 5 (FIX 4)
+      user.loginAttempts = (user.loginAttempts || 0) + 1;
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+      await user.save();
+      invalidateUserCache(user._id);
+
+      if (user.loginAttempts >= 5) {
+        return res.status(423).json({
+          success: false,
+          message: "Too many failed login attempts. Account is temporarily locked for 15 minutes."
+        });
+      }
+
+      const remainingAttempts = 5 - user.loginAttempts;
+      return res.status(400).json({
+        success: false,
+        message: `Invalid credentials. ${remainingAttempts} attempt(s) remaining before temporary lockout.`
+      });
     }
 
+    // Successful login — reset lockout state
     user.loginAttempts = 0;
+    user.lockUntil = null;
     user.lastLogin = Date.now();
     await user.save();
+    invalidateUserCache(user._id);
 
     const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
     const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
+    setAuthCookie(res, token);
 
     res.json({ 
        success: true,
@@ -372,6 +429,7 @@ router.post("/reset-password", async (req, res) => {
     user.lockUntil = null;
     
     await user.save();
+    invalidateUserCache(user._id);
 
     res.json({ success: true, message: "Password reset successfully" });
   } catch (err) {
@@ -444,6 +502,8 @@ router.put("/update-profile", protect, async (req, res) => {
     ).select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry");
 
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    invalidateUserCache(user._id);
 
     res.json(user);
   } catch (err) {
@@ -522,6 +582,7 @@ router.post("/google", async (req, res) => {
       }
       user.lastLogin = Date.now();
       user.loginAttempts = 0;
+      user.lockUntil = null;
       await user.save();
     } else {
       // New user — create account from verified Google profile
@@ -540,12 +601,15 @@ router.post("/google", async (req, res) => {
       sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
     }
 
+    invalidateUserCache(user._id);
+
     const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
     const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d"
     });
+    setAuthCookie(res, token);
 
     res.json({
       success: true,
@@ -636,6 +700,7 @@ router.post("/facebook", async (req, res) => {
       }
       user.lastLogin = Date.now();
       user.loginAttempts = 0;
+      user.lockUntil = null;
       await user.save();
     } else {
       // New user — create account from verified Facebook profile
@@ -654,12 +719,15 @@ router.post("/facebook", async (req, res) => {
       sendWelcomeEmail(user.email, user.name).catch((err) => console.error("[AUTH] Welcome email failed:", err.message));
     }
 
+    invalidateUserCache(user._id);
+
     const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
     const updatedUser = await updateStreak(user, timezone);
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d"
     });
+    setAuthCookie(res, token);
 
     res.json({
       success: true,
@@ -681,6 +749,13 @@ router.post("/facebook", async (req, res) => {
     console.error("Facebook authentication error:", err);
     res.status(500).json({ success: false, message: "Server error during Facebook authentication" });
   }
+});
+
+// @route   POST /api/auth/logout
+// @desc    Clear HttpOnly authentication cookie
+router.post("/logout", (req, res) => {
+  clearAuthCookie(res);
+  res.json({ success: true, message: "Logged out successfully" });
 });
 
 module.exports = router;

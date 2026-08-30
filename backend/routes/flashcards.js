@@ -229,6 +229,7 @@ router.put('/:id/review', protect, async (req, res) => {
 
       const updatedTopic = await updateTopicMastery(req.user.id, topicName, category, {
         isCorrect,
+        sourceType: 'flashcard',
         notes: `Flashcard reviewed with rating ${rating}`,
       });
 

@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 
 // Robust check: Validate that critical environment variables exist (FIX 10)
 const requiredEnvVars = [
@@ -26,10 +27,16 @@ requiredEnvVars.forEach((varName) => {
 
 const app = express();
 
+// Enable trust proxy for accurate rate limiting and IP resolution behind reverse proxies (Railway, Vercel, Render)
+app.set("trust proxy", 1);
+
 // Disable command buffering globally so database outages fail immediately instead of hanging requests
 mongoose.set("bufferCommands", false);
 
 // Middleware
+// Enable cookie parser for HttpOnly session authentication
+app.use(cookieParser());
+
 // FIX 1: Enable helmet with cross-origin configuration
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }

@@ -3,6 +3,21 @@ const router = express.Router();
 const Note = require("../models/Note");
 const { protect, optionalAuth } = require("../middlewares/auth");
 
+// Server-side HTML sanitizer to prevent stored XSS (FIX 10)
+const sanitizeNoteHtml = (dirty) => {
+  if (!dirty || typeof dirty !== 'string') return '';
+  return dirty
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/<link\b[^>]*>/gi, '')
+    .replace(/<meta\b[^>]*>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/on\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
+    .replace(/javascript\s*:/gi, 'blocked:');
+};
+
 // ROUTE 1 — GET /api/notes
 // Fetch notes belonging to req.user.id
 router.get("/", optionalAuth, async (req, res) => {
@@ -29,11 +44,12 @@ router.get("/", optionalAuth, async (req, res) => {
 // Create a new blank note
 router.post("/", protect, async (req, res) => {
   try {
+    const { title, content, summary } = req.body || {};
     const note = new Note({
       user: req.user.id,
-      title: "Untitled Note",
-      content: "",
-      summary: ""
+      title: title ? title.trim() : "Untitled Note",
+      content: content ? sanitizeNoteHtml(content) : "",
+      summary: summary ? sanitizeNoteHtml(summary) : ""
     });
     const savedNote = await note.save();
     res.status(201).json({ success: true, note: savedNote });
@@ -53,10 +69,10 @@ router.put("/:id", protect, async (req, res) => {
       lastEditedAt: Date.now()
     };
     if (title !== undefined) updateData.title = title.trim() || "Untitled Note";
-    if (content !== undefined) updateData.content = content;
-    if (summary !== undefined) updateData.summary = summary;
-    if (tags !== undefined) updateData.tags = tags;
-    if (isPinned !== undefined) updateData.isPinned = isPinned;
+    if (content !== undefined) updateData.content = sanitizeNoteHtml(content);
+    if (summary !== undefined) updateData.summary = sanitizeNoteHtml(summary);
+    if (tags !== undefined) updateData.tags = Array.isArray(tags) ? tags.map(t => typeof t === 'string' ? t.trim() : t) : tags;
+    if (isPinned !== undefined) updateData.isPinned = Boolean(isPinned);
 
     const updatedNote = await Note.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id },
@@ -69,16 +85,6 @@ router.put("/:id", protect, async (req, res) => {
     }
 
     res.json({ success: true, note: updatedNote });
-
-    // Hook into Mastery Engine
-    if (updatedNote.title && updatedNote.title !== "Untitled Note") {
-      const { updateTopicMastery } = require('../utils/mastery');
-      const category = (updatedNote.tags && updatedNote.tags.length > 0) ? updatedNote.tags[0] : "Notes";
-      await updateTopicMastery(req.user.id, updatedNote.title, category, {
-        isCorrect: true,
-        notes: updatedNote.summary || "Studied notes"
-      });
-    }
   } catch (err) {
     console.error("[Notes Update Error]:", err);
     res.status(500).json({ success: false, error: "Failed to update note" });

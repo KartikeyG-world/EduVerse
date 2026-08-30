@@ -45,11 +45,43 @@ const StudyPlanner = () => {
   useEffect(() => {
     if (!isAuthenticated) return; // Guests see an empty plan history — no API call
     fetchSavedPlans();
+    fetchBackendRoutine();
   }, [isAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem('eduverse_daily_routine', JSON.stringify(routine));
   }, [routine]);
+
+  const fetchBackendRoutine = async () => {
+    try {
+      const res = await api.get('/users/routine');
+      if (res.data?.success && Array.isArray(res.data.routine) && res.data.routine.length > 0) {
+        setRoutine(res.data.routine);
+        localStorage.setItem('eduverse_daily_routine', JSON.stringify(res.data.routine));
+      } else {
+        // Backend is empty — check if local storage has existing items to migrate up
+        const localSaved = localStorage.getItem('eduverse_daily_routine');
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          const hasCustomTasks = parsed.some(slot => slot.task && slot.task.trim().length > 0);
+          if (hasCustomTasks) {
+            await api.put('/users/routine', { routine: parsed });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync backend routine:', err);
+    }
+  };
+
+  const syncRoutineToBackend = async (newRoutine) => {
+    if (!isAuthenticated) return;
+    try {
+      await api.put('/users/routine', { routine: newRoutine });
+    } catch (err) {
+      console.error('Failed to persist routine to server:', err);
+    }
+  };
 
   // Handle auto-focus from Dashboard
   useEffect(() => {
@@ -142,12 +174,14 @@ const StudyPlanner = () => {
     const newRoutine = [...routine];
     newRoutine[index].task = value;
     setRoutine(newRoutine);
+    syncRoutineToBackend(newRoutine);
   };
 
   const toggleRoutineStatus = (index) => {
     const newRoutine = [...routine];
     newRoutine[index].status = newRoutine[index].status === 'pending' ? 'completed' : 'pending';
     setRoutine(newRoutine);
+    syncRoutineToBackend(newRoutine);
   };
 
   const resetRoutine = () => {
@@ -165,6 +199,7 @@ const StudyPlanner = () => {
             onClick={() => {
               toast.dismiss(t.id);
               setRoutine(defaultRoutine);
+              syncRoutineToBackend(defaultRoutine);
               toast.success("Routine reset to default");
             }}
             className="px-2.5 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"

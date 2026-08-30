@@ -7,6 +7,50 @@ const axios = require('axios');
 
 const DEFAULT_TIMEOUT_MS = 25000;
 
+// AI Provider Circuit Breaker (FIX 9)
+// Tracks provider failure counts and cools down failing providers for 60s to prevent request blocking
+const circuitState = {
+  openrouter: { failures: 0, state: 'CLOSED', cooldownUntil: 0 },
+  openai: { failures: 0, state: 'CLOSED', cooldownUntil: 0 },
+  groq: { failures: 0, state: 'CLOSED', cooldownUntil: 0 }
+};
+const FAILURE_THRESHOLD = 3;
+const COOLDOWN_MS = 60000; // 60s cooldown
+
+const isProviderAvailable = (provider) => {
+  const c = circuitState[provider];
+  if (!c) return true;
+  if (c.state === 'OPEN') {
+    if (Date.now() > c.cooldownUntil) {
+      c.state = 'HALF_OPEN';
+      return true;
+    }
+    return false;
+  }
+  return true;
+};
+
+const recordProviderSuccess = (provider) => {
+  if (circuitState[provider]) {
+    circuitState[provider].failures = 0;
+    circuitState[provider].state = 'CLOSED';
+    circuitState[provider].cooldownUntil = 0;
+  }
+};
+
+const recordProviderFailure = (provider) => {
+  if (!circuitState[provider]) {
+    circuitState[provider] = { failures: 0, state: 'CLOSED', cooldownUntil: 0 };
+  }
+  const c = circuitState[provider];
+  c.failures += 1;
+  if (c.failures >= FAILURE_THRESHOLD || c.state === 'HALF_OPEN') {
+    c.state = 'OPEN';
+    c.cooldownUntil = Date.now() + COOLDOWN_MS;
+    console.warn(`[CircuitBreaker] Provider ${provider} circuit OPEN (cooling down for 60s until ${new Date(c.cooldownUntil).toISOString()})`);
+  }
+};
+
 /**
  * Sleep helper for exponential backoff
  */
@@ -22,6 +66,11 @@ const callChatCompletion = async (messages, options = {}) => {
   let lastError = null;
 
   for (const provider of providers) {
+    if (!isProviderAvailable(provider)) {
+      console.warn(`[CircuitBreaker] Skipping unavailable/cooling provider: ${provider}`);
+      continue;
+    }
+
     let endpoint = '';
     let apiKey = '';
     let model = options.model;
@@ -73,6 +122,8 @@ const callChatCompletion = async (messages, options = {}) => {
 
         const totalTokens = res.data?.usage?.total_tokens || 0;
 
+        recordProviderSuccess(provider);
+
         return {
           content,
           providerUsed: provider,
@@ -85,7 +136,8 @@ const callChatCompletion = async (messages, options = {}) => {
         const errMsg = err.response?.data?.error?.message || err.message;
 
         if (status === 402) {
-          console.warn(`[AIProvider] ${provider} 402 Payment/Credit Limit. Skipping provider.`);
+          console.warn(`[AIProvider] ${provider} 402 Payment/Credit Limit. Tripping circuit and skipping.`);
+          recordProviderFailure(provider);
           break; // move to next provider immediately
         }
 
@@ -99,6 +151,7 @@ const callChatCompletion = async (messages, options = {}) => {
         }
 
         console.warn(`[AIProvider] Provider ${provider} failed on attempt ${attempt}:`, errMsg);
+        recordProviderFailure(provider);
         break; // try next provider
       }
     }

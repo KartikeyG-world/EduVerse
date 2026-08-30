@@ -86,8 +86,55 @@ const updateStreak = async (user, timezone = null) => {
   return user;
 };
 
+/**
+ * Validates whether a timezone identifier is a supported IANA timezone.
+ * Returns the valid IANA timezone string, or 'UTC' as a safe fallback.
+ */
+const validateIanaTimezone = (timezone) => {
+  if (!timezone || typeof timezone !== 'string') return 'UTC';
+  const trimmed = timezone.trim();
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: trimmed });
+    return trimmed;
+  } catch (_) {
+    return 'UTC';
+  }
+};
+
+/**
+ * Returns an array of the last N calendar days in the specified IANA timezone.
+ * Each entry has: { date: 'YYYY-MM-DD', day: 'Mon' }
+ */
+const getRecentDaysArray = (count = 7, timezone = 'UTC') => {
+  const validTz = validateIanaTimezone(timezone);
+  const now = new Date();
+  const days = [];
+  
+  // Calculate relative day offsets
+  for (let i = count - 1; i >= 0; i--) {
+    const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const dateStr = getLocalDateString(targetDate, validTz);
+    
+    let displayDay = 'Day';
+    try {
+      displayDay = new Intl.DateTimeFormat('en-US', { timeZone: validTz, weekday: 'short' }).format(targetDate);
+    } catch (_) {
+      displayDay = targetDate.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+
+    days.push({
+      date: dateStr,
+      day: displayDay
+    });
+  }
+  return days;
+};
+
 module.exports = {
   updateStreak,
   getLocalDateString,
-  getDayDifference
+  getDayDifference,
+  validateIanaTimezone,
+  getRecentDaysArray
 };
+

@@ -19,29 +19,32 @@ const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const verifyUser = async () => {
-      const currentToken = localStorage.getItem('token');
-      if (currentToken) {
-        try {
+      try {
+        const currentToken = localStorage.getItem('token');
+        if (currentToken) {
           api.defaults.headers.common['Authorization'] = `Bearer ${currentToken}`;
-          const res = await api.get('/auth/me');
+        }
+        // Calls /auth/me which sends HttpOnly cookies automatically via withCredentials: true
+        const res = await api.get('/auth/me');
+        if (res.data && res.data._id) {
           setUser(res.data);
           setIsAuthenticated(true);
           setIsGuest(false);
-        } catch (e) {
-          console.error("Token verification failed:", e);
-          localStorage.removeItem("token");
-          delete api.defaults.headers.common['Authorization'];
-          setToken(null);
+        } else {
           setIsAuthenticated(false);
           setIsGuest(true);
           setUser(null);
         }
-      } else {
+      } catch (e) {
+        localStorage.removeItem("token");
+        delete api.defaults.headers.common['Authorization'];
+        setToken(null);
         setIsAuthenticated(false);
         setIsGuest(true);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     verifyUser();
@@ -86,7 +89,10 @@ const AuthProvider = ({ children }) => {
     setShowAuthModal(false);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (_) {}
     localStorage.removeItem("token");
     delete api.defaults.headers.common['Authorization'];
     setToken(null);

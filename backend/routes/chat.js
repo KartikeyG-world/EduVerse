@@ -6,6 +6,8 @@ const { generateAICompletion } = require("../services/aiGateway");
 
 const openRouterCall = (messages) => generateAICompletion({ messages, maxTokens: 1500 });
 
+const ChatMessage = require("../models/ChatMessage");
+
 // Create a new empty chat session
 router.post("/sessions", protect, async (req, res) => {
   try {
@@ -21,12 +23,30 @@ router.post("/sessions", protect, async (req, res) => {
   }
 });
 
-// Fetch all chat sessions (sidebar list)
+// Fetch all chat sessions (sidebar list) with automatic legacy ChatMessage migration
 router.get("/sessions", protect, async (req, res) => {
   try {
-    const sessions = await ChatSession.find({ userId: req.user._id })
+    let sessions = await ChatSession.find({ userId: req.user._id })
       .select("_id title createdAt updatedAt")
       .sort({ updatedAt: -1 });
+
+    // Non-destructive backward compatibility: migrate legacy ChatMessage records if no sessions exist
+    if (sessions.length === 0) {
+      const legacyMessages = await ChatMessage.find({ user: req.user._id }).sort({ timestamp: 1 }).lean();
+      if (legacyMessages && legacyMessages.length > 0) {
+        const migratedSession = await ChatSession.create({
+          userId: req.user._id,
+          title: "Previous Chat History",
+          messages: legacyMessages.map(m => ({
+            role: m.role || "user",
+            content: m.content || "",
+            timestamp: m.timestamp || m.createdAt || new Date()
+          }))
+        });
+        sessions = [migratedSession];
+      }
+    }
+
     res.json(sessions);
   } catch (err) {
     console.error("[Chat Fetch Sessions Error]:", err);

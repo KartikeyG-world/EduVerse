@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Skill = require('../models/Skill');
 const User = require('../models/User');
-const { protect, optionalAuth } = require('../middlewares/auth');
+const { protect, optionalAuth, invalidateUserCache } = require('../middlewares/auth');
 const { createNotification } = require('../utils/notification');
 const QuizAttempt = require('../models/QuizAttempt');
 const { updateTopicMastery } = require('../utils/mastery');
@@ -376,6 +376,7 @@ router.put('/:id/progress', protect, async (req, res) => {
         if (updatedUser.level !== newLevel) {
           await User.findByIdAndUpdate(req.user.id, { $set: { level: newLevel } });
         }
+        invalidateUserCache(updatedUser._id);
       }
 
       await createNotification(
@@ -430,7 +431,8 @@ router.post('/:id/quiz', protect, async (req, res) => {
     await updateTopicMastery(req.user.id, skill.title, skill.category, {
       isCorrect: percentage >= 70,
       confidence: percentage,
-      difficulty: skill.difficulty || 'medium'
+      difficulty: skill.difficulty || 'medium',
+      sourceType: 'quiz'
     });
 
     res.status(201).json(attempt);
@@ -452,7 +454,9 @@ router.get('/:id/quiz', protect, async (req, res) => {
     const attempts = await QuizAttempt.find({
       skillId: req.params.id,
       userId: req.user.id,
-    }).sort({ date: -1 });
+    })
+      .sort({ date: -1 })
+      .lean();
 
     res.json(attempts);
   } catch (err) {

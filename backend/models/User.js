@@ -71,7 +71,14 @@ const userSchema = new mongoose.Schema({
   loginAttempts: { type: Number, default: 0 },
   lockUntil: { type: Date, default: null },
   lastLogin: { type: Date, default: null },
-  avatar: { type: String, default: "" }
+  avatar: { type: String, default: "" },
+  dailyRoutine: [
+    {
+      time: { type: String, default: "" },
+      task: { type: String, default: "" },
+      status: { type: String, enum: ["pending", "completed"], default: "pending" }
+    }
+  ]
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);

@@ -267,7 +267,15 @@ const Dashboard = () => {
             <div>
               <h3 className="text-gray-400 text-sm font-medium">Deep Work Time</h3>
               <div className="mt-2 text-3xl md:text-4xl font-black text-white flex items-end gap-2">
-                <AnimatedCounter end={stats.focusHours} duration={2000} /> <span className="text-base md:text-lg font-medium text-gray-500 mb-1">hrs</span>
+                {stats.focusHours > 0 && stats.focusHours < 1 ? (
+                  <>
+                    <AnimatedCounter end={Math.round(stats.focusHours * 60)} duration={2000} /> <span className="text-base md:text-lg font-medium text-gray-500 mb-1">min</span>
+                  </>
+                ) : (
+                  <>
+                    <AnimatedCounter end={Number((stats.focusHours || 0).toFixed(1))} duration={2000} /> <span className="text-base md:text-lg font-medium text-gray-500 mb-1">hrs</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="p-2.5 md:p-3 bg-blue-500/10 rounded-xl">

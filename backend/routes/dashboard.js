@@ -5,7 +5,8 @@ const Activity = require("../models/Activity");
 const Plan = require("../models/Plan");
 const TopicMastery = require("../models/TopicMastery");
 const axios = require("axios");
-const { updateStreak } = require("../utils/streak");
+const { updateStreak, validateIanaTimezone, getRecentDaysArray } = require("../utils/streak");
+const { isRevisionDue } = require("../utils/mastery");
 
 // Re-using the robust OpenRouter proxy pattern
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -67,14 +68,16 @@ const getCachedOrGenerateInsight = async (userId, userName, stats) => {
 router.get("/", optionalAuth, async (req, res) => {
   try {
     let user = req.user;
+    const userTimezone = validateIanaTimezone(req.headers['x-timezone']);
 
     // Gracefully handle Native Guest Mode
     if (!user) {
+      const guestDays = getRecentDaysArray(7, userTimezone);
       return res.json({
         stats: { xp: 0, level: 1, streak: 0, focusHours: 0 },
-        dailyActivity: Array.from({length: 7}).map((_, i) => ({
-          date: new Date(Date.now() - (6-i)*86400000).toISOString().split('T')[0],
-          day: new Date(Date.now() - (6-i)*86400000).toLocaleDateString("en-US", { weekday: 'short' }),
+        dailyActivity: guestDays.map(d => ({
+          date: d.date,
+          day: d.day,
           sessions: 0, chats: 0, studyTime: 0
         })),
         topics: { strong: "System Metrics", weak: "Requires Login" },
@@ -90,24 +93,28 @@ router.get("/", optionalAuth, async (req, res) => {
     }
 
     // Update daily streak on dashboard load for authenticated users (timezone-aware)
-    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
-    user = await updateStreak(user, timezone);
+    user = await updateStreak(user, userTimezone);
 
-    // 1. Calculate Last 7 Days Activity Array for the UI Recharts
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+    // 1. Calculate Last 7 Days Activity Array for the UI Recharts in user's IANA timezone
+    const localDays = getRecentDaysArray(7, userTimezone);
+    const queryCutoff = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000); // 8-day UTC buffer for safe match
 
     const activities = await Activity.aggregate([
       {
         $match: {
           userId: user._id,
-          createdAt: { $gte: sevenDaysAgo }
+          createdAt: { $gte: queryCutoff }
         }
       },
       {
         $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          _id: { 
+            $dateToString: { 
+              format: "%Y-%m-%d", 
+              date: "$createdAt",
+              timezone: userTimezone
+            } 
+          },
           sessions: { 
             $sum: { $cond: [{ $eq: ["$type", "study"] }, 1, 0] } 
           },
@@ -122,23 +129,17 @@ router.get("/", optionalAuth, async (req, res) => {
       { $sort: { "_id": 1 } }
     ]);
 
-    // Create a dense array (fill missing dates with 0s)
-    const dailyActivity = [];
-    for (let i = 0; i <= 6; i++) {
-        const d = new Date(sevenDaysAgo);
-        d.setDate(d.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const displayDay = d.toLocaleDateString("en-US", { weekday: 'short' });
-        
-        const found = activities.find(a => a._id === dateStr);
-        dailyActivity.push({
-            date: dateStr,
-            day: displayDay,
-            sessions: found ? found.sessions : 0,
-            chats: found ? found.chats : 0,
-            studyTime: found ? Math.round(found.studyTime / 60) : 0 // Convert to minutes
-        });
-    }
+    // Create a dense array aligned to the user's local 7 calendar days
+    const dailyActivity = localDays.map(d => {
+      const found = activities.find(a => a._id === d.date);
+      return {
+        date: d.date,
+        day: d.day,
+        sessions: found ? found.sessions : 0,
+        chats: found ? found.chats : 0,
+        studyTime: found ? Math.round(found.studyTime / 60) : 0 // Convert to minutes
+      };
+    });
 
     // 2. Weak vs Strong Topics (Determined by TopicMastery)
     const masteryTopics = await TopicMastery.find({ userId: user._id }).lean();
@@ -147,10 +148,10 @@ router.get("/", optionalAuth, async (req, res) => {
     let weakTopic = "Add more topics!";
     
     if (masteryTopics.length > 0) {
-      const sortedByMastery = [...masteryTopics].sort((a, b) => b.masteryScore - a.masteryScore);
+      const sortedByMastery = [...masteryTopics].sort((a, b) => (b.masteryScore || 0) - (a.masteryScore || 0));
       strongTopic = sortedByMastery[0].topicName;
       
-      const weakOnes = masteryTopics.filter(t => t.isWeakArea).sort((a, b) => a.masteryScore - b.masteryScore);
+      const weakOnes = masteryTopics.filter(t => t.isWeakArea).sort((a, b) => (a.masteryScore || 0) - (b.masteryScore || 0));
       if (weakOnes.length > 0) {
         weakTopic = weakOnes[0].topicName;
       } else if (masteryTopics.length > 1) {
@@ -158,15 +159,15 @@ router.get("/", optionalAuth, async (req, res) => {
       }
     }
 
-    // Additional mastery stats for the new UI component
+    // Additional mastery stats for UI component using single source of truth helper
     const now = new Date();
     const masteryStats = {
       totalTopics: masteryTopics.length,
-      masteredCount: masteryTopics.filter(t => t.masteryScore >= 80).length,
+      masteredCount: masteryTopics.filter(t => (t.masteryScore || 0) >= 80).length,
       weakCount: masteryTopics.filter(t => t.isWeakArea).length,
-      revisionDueCount: masteryTopics.filter(t => t.nextRevisionDue <= now).length,
+      revisionDueCount: masteryTopics.filter(t => isRevisionDue(t, now)).length,
       averageMastery: masteryTopics.length > 0 
-        ? Math.round(masteryTopics.reduce((acc, t) => acc + t.masteryScore, 0) / masteryTopics.length)
+        ? Math.round(masteryTopics.reduce((acc, t) => acc + (t.masteryScore || 0), 0) / masteryTopics.length)
         : 0
     };
 
