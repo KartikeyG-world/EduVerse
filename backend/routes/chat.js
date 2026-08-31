@@ -143,7 +143,8 @@ router.delete("/sessions/:sessionId", protect, async (req, res) => {
   try {
     const session = await ChatSession.findById(req.params.sessionId);
     if (!session) return res.status(404).json({ error: "Session not found" });
-    if (session.userId.toString() !== req.user._id.toString()) {
+    const reqUserId = req.user.id || req.user._id?.toString();
+    if (session.userId.toString() !== reqUserId) {
       return res.status(403).json({ error: "Unauthorized" });
     }
 

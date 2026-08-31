@@ -119,7 +119,18 @@ const StudyPlanner = () => {
               setDeletingId(planId);
               try {
                 await api.delete(`/ai/planner/${planId}`);
-                setSavedPlans(prev => prev.filter(p => p._id !== planId));
+                setSavedPlans(prev => {
+                  const updated = prev.filter(p => p._id !== planId);
+                  return updated;
+                });
+                setPlan(currentPlan => {
+                  // If the plan being deleted is currently displayed, clear main view
+                  const deletedObj = savedPlans.find(p => p._id === planId);
+                  if (deletedObj && currentPlan === deletedObj.roadmap) {
+                    return null;
+                  }
+                  return currentPlan;
+                });
                 toast.success("Study plan deleted");
               } catch (err) {
                 console.error("Failed to delete plan:", err);

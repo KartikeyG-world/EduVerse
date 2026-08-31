@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import Layout from './components/layout/Layout';
 import AuthProvider from './context/AuthContext';
 import { ToastProvider } from './components/ui/ToastProvider';
+import { Toaster } from 'react-hot-toast';
 import { InteractionProvider } from './context/InteractionContext';
 import ClickImpact from './components/ui/ClickImpact';
 
@@ -51,6 +52,17 @@ function App() {
                 <InteractionProvider>
                   <ClickImpact />
                   <AuthModal />
+                  <Toaster 
+                    position="top-right"
+                    toastOptions={{
+                      duration: 4000,
+                      style: {
+                        background: '#18181b',
+                        color: '#fff',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                      }
+                    }}
+                  />
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       <Route path="/login" element={<Login />} />

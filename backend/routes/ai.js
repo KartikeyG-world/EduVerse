@@ -101,7 +101,8 @@ router.delete("/planner/:id", protect, async (req, res) => {
     const plan = await Plan.findById(req.params.id);
     if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-    if (plan.userId.toString() !== req.user._id.toString()) {
+    const reqUserId = req.user.id || req.user._id?.toString();
+    if (plan.userId.toString() !== reqUserId) {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
