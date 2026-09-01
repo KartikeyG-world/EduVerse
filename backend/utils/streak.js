@@ -54,6 +54,13 @@ const updateStreak = async (user, timezone = null) => {
   const now = new Date();
   const todayLocalStr = getLocalDateString(now, timezone);
   let isUpdated = false;
+  //check
+  console.log("STREAK DEBUG:", {
+    streak: user.streak,
+    lastActiveDate: user.lastActiveDate,
+    timezone,
+    todayLocalStr
+  });
 
   if (!user.lastActiveDate) {
     user.lastActiveDate = now;
@@ -62,6 +69,13 @@ const updateStreak = async (user, timezone = null) => {
   } else {
     const lastActiveLocalStr = getLocalDateString(user.lastActiveDate, timezone);
     const dayDiff = getDayDifference(lastActiveLocalStr, todayLocalStr);
+    //check
+    console.log("STREAK DAY DIFF:", {
+      lastActiveLocalStr,
+      todayLocalStr,
+      dayDiff,
+      currentStreak: user.streak
+    });
 
     if (dayDiff === 1) {
       // Consecutive calendar day in user's timezone
@@ -109,12 +123,12 @@ const getRecentDaysArray = (count = 7, timezone = 'UTC') => {
   const validTz = validateIanaTimezone(timezone);
   const now = new Date();
   const days = [];
-  
+
   // Calculate relative day offsets
   for (let i = count - 1; i >= 0; i--) {
     const targetDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
     const dateStr = getLocalDateString(targetDate, validTz);
-    
+
     let displayDay = 'Day';
     try {
       displayDay = new Intl.DateTimeFormat('en-US', { timeZone: validTz, weekday: 'short' }).format(targetDate);

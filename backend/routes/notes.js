@@ -77,7 +77,7 @@ router.put("/:id", protect, async (req, res) => {
     const updatedNote = await Note.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id },
       { $set: updateData },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!updatedNote) {

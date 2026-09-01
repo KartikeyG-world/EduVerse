@@ -498,7 +498,7 @@ router.put("/update-profile", protect, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: updateData },
-      { new: true }
+      { returnDocument: 'after' }
     ).select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry");
 
     if (!user) return res.status(404).json({ success: false, message: "User not found" });

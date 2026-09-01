@@ -78,14 +78,13 @@ const topicMasterySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to ensure canonicalTopicName and categories are populated
-topicMasterySchema.pre('save', function(next) {
+topicMasterySchema.pre('save',  async function() {
   if (this.topicName && !this.canonicalTopicName) {
     this.canonicalTopicName = this.topicName.trim().toLowerCase();
   }
   if (this.category && (!this.categories || this.categories.length === 0)) {
     this.categories = [this.category];
   }
-  next();
 });
 
 // Non-unique compound index on canonical topic name (safe before migration)

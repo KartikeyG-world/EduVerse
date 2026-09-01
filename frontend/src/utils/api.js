@@ -31,7 +31,9 @@ api.interceptors.request.use(
     try {
       config.headers['X-Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
       config.headers['X-Timezone-Offset'] = new Date().getTimezoneOffset();
-    } catch (_) {}
+    } catch (error) {
+      console.warn('Unable to detect timezone:', error);
+    }
     return config;
   },
   (error) => {

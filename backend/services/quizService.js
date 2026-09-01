@@ -208,7 +208,7 @@ const generateQuizForWatchRange = async (userId, videoId, watchedStartSec, watch
   const metaRecord = await QuizGenerationMeta.findOneAndUpdate(
     { userId, videoId },
     { $set: metaData },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   );
 
   // If synchronous execution flag is set (for testing/dev only)

@@ -370,7 +370,7 @@ router.put('/:id/progress', protect, async (req, res) => {
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
         { $inc: { xp: xpReward } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       if (updatedUser) {
         const newLevel = Math.floor(updatedUser.xp / 1000) + 1;
