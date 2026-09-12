@@ -47,6 +47,8 @@ const getDayDifference = (dateStr1, dateStr2) => {
 /**
  * Timezone-aware streak updater.
  * Evaluates day boundaries in user's local timezone.
+ * Works with full Mongoose documents (calls user.save()) and lean plain objects alike.
+ * For lean objects, uses User.updateOne to persist and invalidates the auth cache.
  */
 const updateStreak = async (user, timezone = null) => {
   if (!user) return null;
@@ -54,13 +56,6 @@ const updateStreak = async (user, timezone = null) => {
   const now = new Date();
   const todayLocalStr = getLocalDateString(now, timezone);
   let isUpdated = false;
-  //check
-  console.log("STREAK DEBUG:", {
-    streak: user.streak,
-    lastActiveDate: user.lastActiveDate,
-    timezone,
-    todayLocalStr
-  });
 
   if (!user.lastActiveDate) {
     user.lastActiveDate = now;
@@ -69,32 +64,58 @@ const updateStreak = async (user, timezone = null) => {
   } else {
     const lastActiveLocalStr = getLocalDateString(user.lastActiveDate, timezone);
     const dayDiff = getDayDifference(lastActiveLocalStr, todayLocalStr);
-    //check
-    console.log("STREAK DAY DIFF:", {
-      lastActiveLocalStr,
-      todayLocalStr,
-      dayDiff,
-      currentStreak: user.streak
-    });
 
     if (dayDiff === 1) {
-      // Consecutive calendar day in user's timezone
+      // Consecutive calendar day in user's timezone — grow streak
       user.streak = (user.streak || 0) + 1;
       user.lastActiveDate = now;
       isUpdated = true;
     } else if (dayDiff > 1) {
-      // Streak broken
+      // Missed one or more days — reset streak
       user.streak = 1;
       user.lastActiveDate = now;
       isUpdated = true;
     } else if (dayDiff === 0) {
-      // Same calendar day — maintain current streak
+      // Same calendar day — maintain current streak, fix if corrupted to 0
+      if (!user.streak || user.streak < 1) {
+        user.streak = 1;
+        isUpdated = true;
+      }
       user.lastActiveDate = now;
     }
   }
 
-  if (isUpdated && typeof user.save === 'function') {
-    await user.save();
+  // Persist streak changes to the database
+  if (isUpdated) {
+    const userId = user._id || user.id;
+
+    if (typeof user.save === 'function') {
+      // Full Mongoose document path
+      try {
+        await user.save();
+      } catch (saveErr) {
+        console.error("[STREAK] Failed to persist streak update (doc):", saveErr.message);
+      }
+    } else if (userId) {
+      // Lean plain-object path — use lazy require to avoid circular dependency
+      try {
+        const User = require('../models/User');
+        await User.updateOne(
+          { _id: userId },
+          { $set: { streak: user.streak, lastActiveDate: user.lastActiveDate } }
+        );
+      } catch (saveErr) {
+        console.error("[STREAK] Failed to persist streak update (lean):", saveErr.message);
+      }
+    }
+
+    // Invalidate the 60-second user cache so the new streak is read back immediately
+    if (userId) {
+      try {
+        const { invalidateUserCache } = require('../middlewares/auth');
+        invalidateUserCache(userId);
+      } catch (_) {}
+    }
   }
 
   return user;
