@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, ListVideo, FileText, Check, AlertCircle, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 import { useToast } from './ui/ToastProvider';
 
 const SourcePreviewModal = ({ isOpen, onClose, source, onSourceAdded }) => {
+  const navigate = useNavigate();
   const [isAdding, setIsAdding] = useState(false);
   const [addStatus, setAddStatus] = useState('idle'); // 'idle', 'loading', 'success', 'error', 'duplicate'
+  const [addedSkillId, setAddedSkillId] = useState(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       setAddStatus('idle');
       setIsAdding(false);
+      setAddedSkillId(null);
     }
   }, [isOpen, source]);
 
@@ -76,7 +80,7 @@ const SourcePreviewModal = ({ isOpen, onClose, source, onSourceAdded }) => {
     setAddStatus('loading');
 
     try {
-      await api.post('/skillhub/add-source', {
+      const res = await api.post('/skillhub/add-source', {
         sourceUrl: details.url,
         sourceTitle: details.title,
         sourceType: details.type === 'youtube' ? 'video' : details.type,
@@ -86,17 +90,17 @@ const SourcePreviewModal = ({ isOpen, onClose, source, onSourceAdded }) => {
         }
       });
 
+      const skillId = res.data?._id;
+      setAddedSkillId(skillId);
       setAddStatus('success');
       showToast('Source added to Skill Hub successfully!', 'success');
       
       if (onSourceAdded) onSourceAdded();
 
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-
     } catch (err) {
       if (err.response && err.response.status === 409) {
+        const skillId = err.response.data?.skillId;
+        if (skillId) setAddedSkillId(skillId);
         setAddStatus('duplicate');
         showToast('This source is already in your Skill Hub', 'info');
       } else {
@@ -105,6 +109,19 @@ const SourcePreviewModal = ({ isOpen, onClose, source, onSourceAdded }) => {
         setIsAdding(false);
       }
     }
+  };
+
+  const handleWatchNow = () => {
+    onClose();
+    if (addedSkillId) {
+      navigate(`/skills/${addedSkillId}/learn?autoplay=1`);
+    } else {
+      navigate('/skills');
+    }
+  };
+
+  const handleOk = () => {
+    onClose();
   };
 
   const modalVariants = {
@@ -210,27 +227,44 @@ const SourcePreviewModal = ({ isOpen, onClose, source, onSourceAdded }) => {
 
             {/* Footer */}
             <div className="p-4 border-t border-white/5 bg-white/[0.02]">
-              <button
-                onClick={handleAddToSkillHub}
-                disabled={isAdding || addStatus === 'success' || addStatus === 'duplicate'}
-                className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-300 ${
-                  addStatus === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                  addStatus === 'duplicate' ? 'bg-white/10 text-gray-300 border border-white/20' :
-                  addStatus === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' :
-                  'bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 hover:shadow-lg'
-                }`}
-              >
-                {addStatus === 'loading' && <Loader2 size={18} className="animate-spin" />}
-                {addStatus === 'success' && <Check size={18} />}
-                {addStatus === 'duplicate' && <Check size={18} />}
-                {addStatus === 'error' && <AlertCircle size={18} />}
-                
-                {addStatus === 'idle' && 'Add to My Skill Hub'}
-                {addStatus === 'loading' && 'Adding...'}
-                {addStatus === 'success' && 'Added to Skill Hub'}
-                {addStatus === 'duplicate' && 'Already Added'}
-                {addStatus === 'error' && 'Retry'}
-              </button>
+              {addStatus === 'success' || addStatus === 'duplicate' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 py-2 px-3 rounded-xl">
+                    <Check size={14} />
+                    <span>{addStatus === 'success' ? 'Added to your Skill Hub!' : 'Already in your Skill Hub!'}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={handleWatchNow}
+                      className="flex-1 py-2.5 bg-gradient-to-r from-primary to-accent text-black font-bold text-sm rounded-xl flex items-center justify-center gap-2 hover:opacity-95 shadow-[0_0_15px_rgba(var(--primary),0.3)] transition-all"
+                    >
+                      <Play size={16} fill="currentColor" /> Watch Now
+                    </button>
+                    <button
+                      onClick={handleOk}
+                      className="px-6 py-2.5 bg-surface hover:bg-white/10 text-white font-semibold text-sm rounded-xl border border-white/10 transition-all"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddToSkillHub}
+                  disabled={isAdding}
+                  className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-300 ${
+                    addStatus === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30' :
+                    'bg-gradient-to-r from-primary to-accent text-white hover:opacity-90 hover:shadow-lg'
+                  }`}
+                >
+                  {addStatus === 'loading' && <Loader2 size={18} className="animate-spin" />}
+                  {addStatus === 'error' && <AlertCircle size={18} />}
+                  
+                  {addStatus === 'idle' && 'Add to My Skill Hub'}
+                  {addStatus === 'loading' && 'Adding...'}
+                  {addStatus === 'error' && 'Retry'}
+                </button>
+              )}
             </div>
           </motion.div>
         </motion.div>

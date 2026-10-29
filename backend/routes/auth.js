@@ -334,7 +334,7 @@ router.post("/login", async (req, res) => {
 
     const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
     const updatedUser = await updateStreak(user, timezone);
-
+    
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
     setAuthCookie(res, token);
 
@@ -444,20 +444,24 @@ router.get("/me", protect, async (req, res) => {
     const user = await User.findById(req.user.id).select("-password -otp -otpExpiry -resetPasswordToken -resetPasswordExpiry");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
     
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    const updatedUser = await updateStreak(user, timezone);
+    const resolvedUser = updatedUser || user;
+
     res.json({
-      id: user._id,
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      xp: user.xp,
-      level: user.level,
-      streak: user.streak || 0,
-      focusHours: user.focusHours || 0,
-      tutorPoints: user.tutorPoints || 0,
-      isVerified: user.isVerified,
-      lastLogin: user.lastLogin,
-      createdAt: user.createdAt
+      id: resolvedUser._id,
+      _id: resolvedUser._id,
+      name: resolvedUser.name,
+      email: resolvedUser.email,
+      avatar: resolvedUser.avatar,
+      xp: resolvedUser.xp,
+      level: resolvedUser.level,
+      streak: resolvedUser.streak || 0,
+      focusHours: resolvedUser.focusHours || 0,
+      tutorPoints: resolvedUser.tutorPoints || 0,
+      isVerified: resolvedUser.isVerified,
+      lastLogin: resolvedUser.lastLogin,
+      createdAt: resolvedUser.createdAt
     });
   } catch (err) {
     console.error(err);

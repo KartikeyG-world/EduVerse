@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Clock, FileText, Code,
   BarChart3, MessageSquare, CreditCard, GraduationCap,
-  LogOut, User, Flame, X, Layers
+  LogOut, User, Flame, X, Layers, Hammer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthContext } from '../../context/AuthContext';
@@ -12,6 +12,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 const NAV_LINKS = [
   { name: 'Dashboard',      path: '/',        icon: <LayoutDashboard size={18} /> },
   { name: 'Study Planner',  path: '/planner', icon: <BookOpen size={18} /> },
+  { name: 'Build Paths',    path: '/build-paths', icon: <Hammer size={18} /> },
   { name: 'Focus Mode',     path: '/focus',   icon: <Clock size={18} /> },
   { name: 'Smart Notes',    path: '/notes',   icon: <FileText size={18} /> },
   // Phase 2: SRS

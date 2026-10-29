@@ -80,7 +80,7 @@ const callChatCompletion = async (messages, options = {}) => {
       apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
       if (!apiKey) continue;
       endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-      model = model || process.env.AI_MODEL || 'openai/gpt-3.5-turbo';
+      model = model || process.env.AI_MODEL || 'openai/gpt-4o-mini';
       headers['Authorization'] = `Bearer ${apiKey}`;
       headers['HTTP-Referer'] = process.env.FRONTEND_URL || 'https://edu-verse-psi.vercel.app';
       headers['X-OpenRouter-Title'] = 'EduVerse AI Quiz Generator';
@@ -88,7 +88,7 @@ const callChatCompletion = async (messages, options = {}) => {
       apiKey = (process.env.OPENAI_API_KEY || '').trim();
       if (!apiKey) continue;
       endpoint = 'https://api.openai.com/v1/chat/completions';
-      model = model || 'gpt-3.5-turbo';
+      model = model || 'gpt-4o-mini';
       headers['Authorization'] = `Bearer ${apiKey}`;
     } else if (provider === 'groq') {
       apiKey = (process.env.GROQ_API_KEY || '').trim();

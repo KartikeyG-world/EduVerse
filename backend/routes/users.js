@@ -4,6 +4,7 @@ const User = require("../models/User");
 const { protect, optionalAuth, invalidateUserCache } = require("../middlewares/auth");
 const { createNotification } = require("../utils/notification");
 const Activity = require("../models/Activity");
+const { updateStreak } = require("../utils/streak");
 
 // Fetch current user stats with unified DTO
 router.get("/me", optionalAuth, async (req, res) => {
@@ -11,7 +12,10 @@ router.get("/me", optionalAuth, async (req, res) => {
     if (!req.user) {
       return res.json({ name: 'Guest Student', xp: 0, level: 1, streak: 0, focusHours: 0, tutorPoints: 0 });
     }
-    const user = req.user;
+    const timezone = req.headers['x-timezone'] || (req.headers['x-timezone-offset'] !== undefined ? Number(req.headers['x-timezone-offset']) : null);
+    const updatedUser = await updateStreak(req.user, timezone);
+    const user = updatedUser || req.user;
+
     res.json({
       id: user._id,
       _id: user._id,

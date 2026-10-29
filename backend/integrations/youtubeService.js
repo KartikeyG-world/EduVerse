@@ -303,6 +303,114 @@ const getPlaylistCount = async (playlistId) => {
   return null;
 };
 
+/**
+ * Sourced YouTube video curation for build-path modules.
+ * Applies quality signals: view count, education focus, reasonable duration (3-90 mins).
+ * Uses YouTube Data API v3 when apiKey is present, with robust fallback to yt-search.
+ */
+const getCuratedVideosForTopic = async (query, count = 3, options = {}) => {
+  const targetCount = Math.max(1, Math.min(count, 5));
+  const cleanQuery = (query || '').trim();
+  if (!cleanQuery) return [];
+
+  const apiKey = process.env.YOUTUBE_API_KEY;
+
+  // 1. Primary: YouTube Data API v3
+  if (apiKey) {
+    try {
+      const searchRes = await axios.get('https://www.googleapis.com/youtube/v3/search', {
+        params: {
+          part: 'id,snippet',
+          q: `${cleanQuery} tutorial`,
+          maxResults: 10,
+          type: 'video',
+          videoEmbeddable: 'true',
+          key: apiKey,
+        },
+        timeout: 6000,
+      });
+
+      const items = searchRes.data?.items || [];
+      const videoIds = items.map((it) => it.id?.videoId).filter(Boolean).join(',');
+
+      if (videoIds) {
+        const statsRes = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
+          params: {
+            part: 'snippet,statistics,contentDetails',
+            id: videoIds,
+            key: apiKey,
+          },
+          timeout: 6000,
+        });
+
+        const videoDetails = statsRes.data?.items || [];
+        const candidates = videoDetails
+          .map((v) => {
+            const durationSec = parseISO8601Duration(v.contentDetails?.duration);
+            const views = parseInt(v.statistics?.viewCount, 10) || 0;
+            return {
+              title: v.snippet?.title || 'Video Tutorial',
+              url: `https://www.youtube.com/watch?v=${v.id}`,
+              videoId: v.id,
+              channel: v.snippet?.channelTitle || 'YouTube',
+              duration: formatSeconds(durationSec),
+              durationSec,
+              views,
+            };
+          })
+          // Quality filter: between 3 mins and 90 mins (avoids 15-second clickbait and 12-hour streams)
+          .filter((v) => v.durationSec >= 180 && v.durationSec <= 5400);
+
+        // Rank by view count
+        candidates.sort((a, b) => b.views - a.views);
+
+        if (candidates.length > 0) {
+          return candidates.slice(0, targetCount).map(({ durationSec, ...rest }) => rest);
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[YouTubeService:CuratedVideos] YouTube Data API failed, trying yt-search fallback:', apiErr.message);
+    }
+  }
+
+  // 2. Fallback: yt-search library
+  try {
+    const yts = require('yt-search');
+    const searchRes = await yts(`${cleanQuery} practical tutorial project`);
+    const videos = searchRes?.videos || [];
+
+    const candidates = videos
+      .filter((v) => (v.seconds || 0) >= 180 && (v.seconds || 0) <= 5400)
+      .map((v) => ({
+        title: v.title,
+        url: v.url || `https://www.youtube.com/watch?v=${v.videoId}`,
+        videoId: v.videoId,
+        channel: v.author?.name || 'YouTube',
+        duration: v.duration?.timestamp || formatSeconds(v.seconds),
+        views: v.views || 0,
+      }));
+
+    candidates.sort((a, b) => b.views - a.views);
+
+    if (candidates.length > 0) {
+      return candidates.slice(0, targetCount);
+    }
+
+    // If duration filter was too aggressive, return top unfiltered
+    return videos.slice(0, targetCount).map((v) => ({
+      title: v.title,
+      url: v.url || `https://www.youtube.com/watch?v=${v.videoId}`,
+      videoId: v.videoId,
+      channel: v.author?.name || 'YouTube',
+      duration: v.duration?.timestamp || '10:00',
+      views: v.views || 0,
+    }));
+  } catch (ytsErr) {
+    console.warn('[YouTubeService:CuratedVideos] yt-search fallback failed:', ytsErr.message);
+    return [];
+  }
+};
+
 module.exports = {
   parseISO8601Duration,
   formatSeconds,
@@ -311,4 +419,6 @@ module.exports = {
   getVideoWatchContext,
   fetchPlaylistDetails,
   getPlaylistCount,
+  getCuratedVideosForTopic,
 };
+

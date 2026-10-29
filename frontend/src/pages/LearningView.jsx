@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import toast from 'react-hot-toast';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -160,6 +160,8 @@ window.onYouTubeIframeAPIReady = () => {
 const LearningView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shouldAutoplay = new URLSearchParams(location.search).get('autoplay') === '1';
 
   const [skill, setSkill]               = useState(null);
   const [loading, setLoading]           = useState(true);
@@ -662,7 +664,7 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
         width:  '100%',
         height: '100%',
         playerVars: {
-          autoplay:       0,
+          autoplay:       shouldAutoplay ? 1 : 0,
           modestbranding: 1,
           rel:            0,
           disablekb:      0,
@@ -673,6 +675,12 @@ Make each question test real conceptual understanding. correctIndex is 0-based.`
         events: {
           onReady: (event) => {
             playerRef.current = event.target;
+
+            if (shouldAutoplay) {
+              try {
+                event.target.playVideo();
+              } catch (_) {}
+            }
 
             if (skill.type !== 'playlist') {
               const dur = event.target.getDuration();

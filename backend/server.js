@@ -121,6 +121,8 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/forgot-password", authLimiter);
 app.use("/api/ai", aiLimiter);
+// Guide endpoint on build-paths triggers AI generation on cache-miss; explicitly rate-limited.
+app.use(/^\/api\/build-paths\/templates\/[^/]+\/modules\/[^/]+\/guide$/, aiLimiter);
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
@@ -139,6 +141,7 @@ app.use("/api/mastery", require("./routes/mastery"));
 app.use("/api/flashcards", require("./routes/flashcards")); // Phase 2: SRS
 app.use("/api/chat", require("./routes/chat"));
 app.use("/api", require("./routes/videoRoutes"));
+app.use("/api/build-paths", require("./routes/buildPaths"));
 
 // FIX 9: Global Express error handler middleware
 app.use((err, req, res, next) => {

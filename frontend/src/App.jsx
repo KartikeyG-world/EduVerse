@@ -26,6 +26,7 @@ const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Tutor = lazy(() => import('./pages/Tutor'));
 const FlashcardStudy = lazy(() => import('./pages/FlashcardStudy')); // Phase 2: SRS
+const BuildPaths = lazy(() => import('./pages/BuildPaths'));
 
 import { CompanionProvider } from './context/CompanionContext';
 import { FocusProvider } from './context/FocusContext';
@@ -78,6 +79,7 @@ function App() {
                       <Route path="/" element={<Layout />}>
                         <Route index element={<Dashboard />} />
                         <Route path="planner" element={<StudyPlanner />} />
+                        <Route path="build-paths" element={<BuildPaths />} />
                         <Route path="focus" element={<FocusMode />} />
                         <Route path="notes" element={<SmartNotes />} />
                         <Route path="skills" element={<SkillsHub />} />

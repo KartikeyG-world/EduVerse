@@ -18,7 +18,7 @@ router.post('/add-source', protect, async (req, res) => {
     // Check for duplicate
     const existingSkill = await Skill.findOne({ userId: req.user.id, videoUrl: sourceUrl });
     if (existingSkill) {
-      return res.status(409).json({ message: 'Source already added' });
+      return res.status(409).json({ message: 'Source already added', skillId: existingSkill._id });
     }
 
     let type = sourceType === 'documentation' ? 'documentation' : (sourceType === 'playlist' ? 'playlist' : 'video');

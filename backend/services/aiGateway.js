@@ -8,7 +8,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
  */
 const generateAICompletion = async ({
   messages,
-  model = "openai/gpt-3.5-turbo",
+  model = "openai/gpt-4o-mini",
   maxTokens = null,
   temperature = 0.7,
   timeoutMs = 15000

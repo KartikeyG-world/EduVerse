@@ -32,6 +32,25 @@ const problemSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Solution',
     default: null
+  },
+  isBuildPathReview: {
+    type: Boolean,
+    default: false
+  },
+  buildPathMeta: {
+    templateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BuildPathTemplate',
+      default: null
+    },
+    moduleIndex: {
+      type: Number,
+      default: null
+    },
+    moduleTitle: {
+      type: String,
+      default: null
+    }
   }
 }, { timestamps: true });
 

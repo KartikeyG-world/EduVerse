@@ -24,7 +24,7 @@ Write a very short, punchy, 2-sequence encouraging insight or tip for them. Keep
     const MAX_TOKENS = Math.min(parseInt(process.env.AI_MAX_TOKENS) || 1000, 1000);
     const response = await axios.post(OPENROUTER_URL, 
       {
-        model: "openai/gpt-3.5-turbo",
+        model: "openai/gpt-4o-mini",
         messages: [{ role: "system", content: prompt }],
         max_tokens: MAX_TOKENS
       },

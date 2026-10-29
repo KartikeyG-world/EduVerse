@@ -27,6 +27,7 @@ export default function Tutor() {
   // States: Teacher
   const [teacherSubject, setTeacherSubject] = useState('Maths');
   const [teacherProblems, setTeacherProblems] = useState([]);
+  const [teacherFilter, setTeacherFilter] = useState('all'); // 'all' | 'build-paths' | 'questions'
   const [solveModalOpen, setSolveModalOpen] = useState(false);
   const [activeProblem, setActiveProblem] = useState(null);
   const [solutionText, setSolutionText] = useState('');
@@ -263,8 +264,15 @@ export default function Tutor() {
                          <div key={prob._id} className="glass p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                              <div className="flex justify-between items-start">
                                  <div>
-                                     <span className="text-xs bg-surface px-2 py-0.5 rounded text-primary border border-primary/20">{prob.subject}</span>
-                                     <p className="mt-2 text-white font-medium text-lg">{prob.questionText}</p>
+                                     <div className="flex flex-wrap items-center gap-2">
+                                         <span className="text-xs bg-surface px-2 py-0.5 rounded text-primary border border-primary/20">{prob.subject}</span>
+                                         {prob.isBuildPathReview && (
+                                             <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                                                 🚀 Project Build Review{prob.buildPathMeta?.moduleTitle ? ` • ${prob.buildPathMeta.moduleTitle}` : ''}
+                                             </span>
+                                         )}
+                                     </div>
+                                     <p className="mt-2 text-white font-medium text-lg whitespace-pre-wrap">{prob.questionText}</p>
                                  </div>
                                  {prob.status === 'solved' ? (
                                      <span className="px-3 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-lg border border-green-500/30 flex items-center gap-1"><CheckCircle2 size={12}/> SOLVED</span>
@@ -339,33 +347,66 @@ export default function Tutor() {
                  </ScrollRevealGroup>
              </ParallaxLayer>
 
-             <ParallaxLayer depth={0.04}>
-                 <div className="flex justify-between items-center bg-accent/10 p-4 rounded-2xl border border-accent/20">
-                 <p className="text-accent text-sm font-medium">Earn XP dynamically by solving structural threads published by native network students.</p>
-                 <PremiumButton>
-                    <select 
-                        value={teacherSubject} 
-                        onChange={(e) => setTeacherSubject(e.target.value)}
-                        className="bg-surface border border-white/10 rounded-xl p-2 px-4- text-sm text-white outline-none focus:border-accent"
-                    >
-                        {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                 </PremiumButton>
-             </div>
+             <ParallaxLayer depth={0.05}>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-accent/10 p-4 rounded-2xl border border-accent/20">
+                  <div>
+                      <p className="text-accent text-sm font-medium">Earn XP dynamically by solving structural threads published by native network students.</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <button 
+                             onClick={() => setTeacherFilter('all')}
+                             className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${teacherFilter === 'all' ? 'bg-accent text-black font-bold' : 'bg-surface text-gray-400 hover:text-white'}`}
+                          >
+                             All Queries
+                          </button>
+                          <button 
+                             onClick={() => setTeacherFilter('build-paths')}
+                             className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${teacherFilter === 'build-paths' ? 'bg-purple-600 text-white font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]' : 'bg-surface text-gray-400 hover:text-purple-300'}`}
+                          >
+                             🚀 Project Reviews
+                          </button>
+                          <button 
+                             onClick={() => setTeacherFilter('questions')}
+                             className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${teacherFilter === 'questions' ? 'bg-accent text-black font-bold' : 'bg-surface text-gray-400 hover:text-white'}`}
+                          >
+                             📚 Academic Q&A
+                          </button>
+                      </div>
+                  </div>
+                  <PremiumButton>
+                     <select 
+                         value={teacherSubject} 
+                         onChange={(e) => setTeacherSubject(e.target.value)}
+                         className="bg-surface border border-white/10 rounded-xl p-2 px-4 text-sm text-white outline-none focus:border-accent"
+                     >
+                         {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                     </select>
+                  </PremiumButton>
+              </div>
 
              <ScrollRevealGroup stagger={0.08} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {teacherProblems.length === 0 ? (
+                 {teacherProblems
+                      .filter(p => teacherFilter === 'all' ? true : teacherFilter === 'build-paths' ? p.isBuildPathReview : !p.isBuildPathReview)
+                      .length === 0 ? (
                      <div className="col-span-1 md:col-span-2 glass p-10 text-center text-gray-400 rounded-xl border border-white/5 border-dashed">
-                        No active unsolved problems detected securely inside <strong className="text-accent">{teacherSubject}</strong>. Check back soon.
+                        No active problems detected matching filter in <strong className="text-accent">{teacherSubject}</strong>. Check back soon.
                      </div>
-                 ) : teacherProblems.map(prob => (
+                 ) : teacherProblems
+                      .filter(p => teacherFilter === 'all' ? true : teacherFilter === 'build-paths' ? p.isBuildPathReview : !p.isBuildPathReview)
+                      .map(prob => (
                      <div key={prob._id} className="glass-next-gen dynamic-lighting p-6 border-t-2 border-t-accent hover:shadow-[0_0_30px_rgba(var(--accent),0.1)] transition-all flex flex-col justify-between h-full rounded-2xl">
                          <div>
-                            <div className="flex justify-between mb-3">
-                                <span className="text-xs bg-surface px-2 py-0.5 rounded text-accent border border-accent/20 flex items-center gap-1"><Book size={10}/> {prob.subject}</span>
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs bg-surface px-2 py-0.5 rounded text-accent border border-accent/20 flex items-center gap-1"><Book size={10}/> {prob.subject}</span>
+                                    {prob.isBuildPathReview && (
+                                        <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                                            🚀 Project Review
+                                        </span>
+                                    )}
+                                </div>
                                 <span className="text-xs text-gray-500 font-medium">{new Date(prob.createdAt).toLocaleDateString()}</span>
                             </div>
-                            <h3 className="text-lg font-medium text-white mb-6 leading-relaxed">{prob.questionText}</h3>
+                            <h3 className="text-lg font-medium text-white mb-6 leading-relaxed whitespace-pre-wrap">{prob.questionText}</h3>
                          </div>
                          
                          <div className="flex items-center justify-between mt-auto">
